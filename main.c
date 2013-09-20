@@ -5,7 +5,8 @@
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 768;
 
-
+//////////////////////////////////////////////////////////////////////
+// MISC FUNCTIONS
 void Cleanup() {
    SDL_Quit();
 }
@@ -52,6 +53,14 @@ void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
    SDL_RenderCopy(ren, tex, NULL, &dest);
 }
 
+
+void loadAssets() {
+   //SDL_Texture *tex = loadTexture("data/hello.bmp", ren);
+}
+
+//////////////////////////////////////////////////////////////////////
+// GAMEPLAY
+
 typedef enum {
    F_UP,
    F_DOWN,
@@ -96,6 +105,7 @@ typedef struct {
 typedef struct {
    char tiles[ZONEWIDTH][ZONEHEIGHT];
    mob mobs[NUMMOBS];
+   // Exits...
 } zone;
 
 void drawZone(zone *z) {
@@ -117,6 +127,15 @@ void drawWorld(world *w) {
 
 static player thePlayer;
 static world theWorld;
+
+//////////////////////////////////////////////////////////////////////
+// INPUT HANDLING
+
+
+
+
+//////////////////////////////////////////////////////////////////////
+// MAIN STUFF
 
 void mainloop(SDL_Renderer *ren) {
    bool keepgoing = true;
@@ -161,13 +180,7 @@ int main(int argc, char** argv) {
 					  SDL_RENDERER_ACCELERATED);
    CheckError(!ren, "SDL renderer create error");
 
-   SDL_Texture *tex = loadTexture("data/hello.bmp", ren);
-
-   for(int i = 0; i < 100; i++) {
-      SDL_RenderClear(ren);
-      renderTexture(tex, ren, i, i);
-      SDL_Delay(30);
-   }
+   mainloop(ren);
 
    SDL_DestroyTexture(tex);
    SDL_DestroyRenderer(ren);
