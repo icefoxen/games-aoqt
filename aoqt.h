@@ -22,6 +22,13 @@ typedef enum {
    F_RIGHT
 } facing;
 
+typedef enum {
+   PS_STANDING,
+   PS_WALKING,
+   PS_ATTACKING,
+   PS_FIRING
+} playerState;
+
 
 #define MAXHITS 10
 #define STARTINGARROWS 10
@@ -74,6 +81,7 @@ typedef struct {
 
    player player;
    atlas terrainAtlas;
+   atlas playerAtlas;
 } gamestate;
 
 #endif  // _AOQT_H

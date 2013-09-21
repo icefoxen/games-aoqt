@@ -49,15 +49,16 @@ void loadAtlas(atlas* atl, char *file, SDL_Renderer *ren, int spriteSize) {
    SDL_QueryTexture(atl->tex, NULL, NULL, &w, &h);
    atl->width = w / atl->spriteSize;
    atl->height = h / atl->spriteSize;
-   if(atl->width % atl->spriteSize != 0 ||
-      atl->height % atl->spriteSize != 0) {
+   if((w % atl->spriteSize) != 0 ||
+      (h % atl->spriteSize) != 0) {
       logWarning("Atlas does not divide evenly into integer tiles!");
+      printf("%d %% %d = %d\n", w, atl->spriteSize, (w % atl->spriteSize));
    }
 }
 
 void loadAssets(SDL_Renderer* ren, gamestate* g) {
-   loadAtlas(&(g->terrainAtlas), "data/testsheet.bmp", ren, 64);
-   
+   loadAtlas(&(g->terrainAtlas), "data/terrain.bmp", ren, 64);
+   loadAtlas(&(g->playerAtlas), "data/player.bmp", ren, 64);
    
 }
 
@@ -104,11 +105,10 @@ void renderSprite(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
 */
 
 
-
-
-void drawZone(SDL_Renderer* ren, gamestate* g, zone *z) {
+void drawZone(SDL_Renderer *ren, gamestate *g, zone *z) {
    SDL_Rect sourceRect, destRect;
    const int spriteSize = g->terrainAtlas.spriteSize;
+   //printf("Sprite size: %d\n", spriteSize);
    destRect.w = spriteSize;
    destRect.h = spriteSize;
    for(int x = 0; x < ZONEWIDTH; x++) {
@@ -121,9 +121,18 @@ void drawZone(SDL_Renderer* ren, gamestate* g, zone *z) {
    }
 }
 
+void drawPlayer(SDL_Renderer *ren, gamestate *g) {
+   SDL_Rect sourceRect, destRect;
+   atlasCoords(&(g->playerAtlas), 0, &sourceRect);
+   destRect.x = g->player.x;
+   destRect.y = g->player.y;
+   SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
+}
+
 void drawWorld(SDL_Renderer* ren, gamestate *g) {
    zone *currentZone = &(g->zones[g->zx][g->zy]);
    drawZone(ren, g, currentZone);
+   drawPlayer(ren, g);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -132,14 +141,23 @@ void drawWorld(SDL_Renderer* ren, gamestate *g) {
 
 bool handleEvents() {
    SDL_Event e;
+   SDL_KeyboardEvent kev;
    while(SDL_PollEvent(&e)) {
       switch(e.type) {
 	 case SDL_KEYDOWN:
+	    kev = e.key;
+	    if(kev.keysym.sym == SDLK_q || 
+	       kev.keysym.sym == SDLK_ESCAPE) {
+	       return false;
+	    }
 	    break;
+
 	 case SDL_KEYUP:
 	    break;
+
 	 case SDL_QUIT:
 	    return false;
+
 	 default:
 	    break;
       }
@@ -166,6 +184,11 @@ void initGamestate(gamestate *g) {
    g->zx = 0;
    g->zy = 0;
    initPlayer(&(g->player));
+}
+
+void destroyGamestate(gamestate *g) {
+   SDL_DestroyTexture(g->terrainAtlas.tex);
+   SDL_DestroyTexture(g->playerAtlas.tex);
 }
 
 void mainloop(SDL_Renderer *ren) {
@@ -200,6 +223,8 @@ void mainloop(SDL_Renderer *ren) {
       uint32_t dt = SDL_GetTicks() - now;
       printf("Frame time: %d\n", dt);
    }
+
+   destroyGamestate(&g);
 }
 
 
