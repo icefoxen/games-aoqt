@@ -25,6 +25,10 @@ void checkError(bool errorTest, char *message) {
    }
 }
 
+zone* getCurrentZone(gamestate *g) {
+   return &(g->zones[g->zx][g->zy]);
+}
+
 //////////////////////////////////////////////////////////////////////
 // RESOURCE HANDLING
 
@@ -87,37 +91,39 @@ void atlasCoords(atlas* atl, int index, SDL_Rect* rect) {
 //////////////////////////////////////////////////////////////////////
 // GAMEPLAY
 
-void calcPlayer(gamestate *g, int dt) {
+void handlePlayerInput(gamestate *g) {
    inputState *i = &(g->input);
    player *p = &(g->player);
-   double fdt = (double) dt;
-   double movementAmount = g->player.movementSpeed * fdt / 1000.0;
+
    if(i->up) {
-      p->y = fmax(0.0, p->y - movementAmount);
-      //printf("UP: %f %f\n", movementAmount, p->y);
+      p->velX = 0;
+      p->velY = -p->movementSpeed;
+      p->state = PS_WALKING;
       p->facing = F_UP;
    } else if(i->down) {
-      p->y = fmin(SCREEN_HEIGHT - p->size, p->y + movementAmount);
+      p->velX = 0;
+      p->velY = p->movementSpeed;
+      p->state = PS_WALKING;
       p->facing = F_DOWN;
       //printf("DOWN: %f %f\n", movementAmount, p->y);
-   }
-
-   if(i->left) {
-      p->x = fmax(0.0, p->x - movementAmount);
+   } else if(i->left) {
+      p->velX = -p->movementSpeed;
+      p->velY = 0;
+      p->state = PS_WALKING;
       p->facing = F_LEFT;
       //printf("LEFT: %f %f\n", movementAmount, p->x);
    } else if(i->right) {
-      p->x = fmin(SCREEN_WIDTH - p->size, p->x + movementAmount);
+      p->velX = p->movementSpeed;
+      p->velY = 0;
+      p->state = PS_WALKING;
       p->facing = F_RIGHT;
       //printf("RIGHT: %f %f\n", movementAmount, p->x);
-   }
-   
-   if(i->left || i->right || i->up || i->down) {
-      p->state = PS_WALKING;
    } else {
       p->state = PS_STANDING;
+      p->velX = 0;
+      p->velY = 0;
    }
-
+   
    if(i->sword) {
    }
 
@@ -125,7 +131,36 @@ void calcPlayer(gamestate *g, int dt) {
    }
 }
 
+void calcPlayer(gamestate *g, int dt) {
+   player *p = &(g->player);
+   double fdt = (double) dt;
+   //double movementAmount = g->player.movementSpeed * fdt / 1000.0;
+
+   handlePlayerInput(g);
+   double xOffset = p->velX * fdt / 1000.0;
+   double yOffset = p->velY * fdt / 1000.0;
+
+   p->x = fmax(0.0, fmin(SCREEN_WIDTH  - p->size, p->x + xOffset));
+   p->y = fmax(0.0, fmin(SCREEN_HEIGHT - p->size, p->y + yOffset));
+}
+
+void calcMob(gamestate *g, mob *m, int dt) {
+   double fdt = (double) dt;
+   double xOffset = m->velX * fdt / 1000.0;
+   double yOffset = m->velY * fdt / 1000.0;
+
+   m->x = fmax(0.0, fmin(SCREEN_WIDTH  - m->size, m->x + xOffset));
+   m->y = fmax(0.0, fmin(SCREEN_HEIGHT - m->size, m->y + yOffset));
+}
+
 void calcMobs(gamestate *g, int dt) {
+   zone *z = getCurrentZone(g);
+   for(int i = 0; i < NUMMOBS; i++) {
+      mob *m = &(z->mobs[i]);
+      if(m->hits > 0) {
+	 calcMob(g, m, dt);
+      }
+   }
 }
 
 // Get bounding boxes for collision
@@ -143,8 +178,50 @@ void getMobBB(mob *m, SDL_Rect *rect) {
    rect->h = m->size;
 }
 
-zone* getCurrentZone(gamestate *g) {
-   return &(g->zones[g->zx][g->zy]);
+void handlePlayerTerrainCollision(gamestate *g, SDL_Rect *collision) {
+   player *p = &(g->player);
+
+   // This assumes that nothing except deliberate player movement
+   // can move the player.
+   // No knockback, etc.  
+   if(p->velX > 0 && collision->x > p->x) {
+      // We are hitting a tile on the right
+      p->velX = 0;
+      p->x -= collision->w;
+   } else if(p->velX < 0 && collision->x <= p->x) {
+      // We are hitting a tile on the left
+      p->velX = 0;
+      p->x += collision->w;
+   } else if(p->velY > 0 && collision->y > p->y) {
+      // We are hitting a tile below us
+      p->velY = 0;
+      p->y -= collision->h;
+   } else if(p->velY < 0 && collision->y <= p->y) {
+      // We are hitting a tile above us
+      p->velY = 0;
+      p->y += collision->h;
+   }
+
+
+
+/*
+   if(collision->x > p->x && p->facing == F_RIGHT) {
+      // We are hitting a tile on the right
+      printf("Collision to the right\n");
+   } else {
+      // We are hitting a tile on the left
+      printf("Collision to the left\n");
+   }
+
+   if(collision->y > p->y) {
+      // We are hitting a tile below us
+      printf("Collision to the bottom\n");
+   } else {
+      // We are hitting a tile above us
+      printf("Collision to the top\n");
+   }
+*/
+   
 }
 
 // By definition the bottom half of an atlas image is made of
@@ -155,8 +232,27 @@ void collideTerrain(gamestate *g) {
    SDL_Rect playerBB;
    getPlayerBB(&(g->player), &playerBB);
    zone *z = getCurrentZone(g);
-
-
+   
+   // KISS
+   SDL_Rect tileRect;
+   tileRect.w = terrain->spriteSize;
+   tileRect.h = terrain->spriteSize;
+   for(int x = 0; x < ZONEWIDTH; x++) {
+      for(int y = 0; y < ZONEHEIGHT; y++) {
+	 int tile = z->tiles[x][y];
+	 if(tile < tileCollideThreshold) {
+	    continue;
+	 } else {
+	    tileRect.x = x * terrain->spriteSize;
+	    tileRect.y = y * terrain->spriteSize;
+	    SDL_Rect result;
+	    if(SDL_IntersectRect(&playerBB, &tileRect, &result)) {
+	       handlePlayerTerrainCollision(g, &result);
+	       //printf("Colliding: %d %d %d %d\n", result.x, result.y, result.w, result.h);
+	    }
+	 }
+      }
+   }
 }
 
 void collideMobs(gamestate *g) {
@@ -206,10 +302,24 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
    SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
 }
 
+void drawMob(SDL_Renderer *ren, gamestate *g, mob *m) {
+}
+
+void drawMobs(SDL_Renderer *ren, gamestate *g) {
+   zone *z = getCurrentZone(g);
+   for(int i = 0; i < NUMMOBS; i++) {
+      mob *m = &(z->mobs[i]);
+      if(m->hits > 0) {
+	 drawMob(ren, g, m);
+      }
+   }
+}
+
 void drawWorld(SDL_Renderer* ren, gamestate *g) {
    zone *currentZone = getCurrentZone(g);
    drawZone(ren, g, currentZone);
    drawPlayer(ren, g);
+   drawMobs(ren, g);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -333,8 +443,8 @@ void generateWorld(gamestate *g) {
 // MAIN STUFF
 
 void initPlayer(gamestate *g, player *p) {
-   p->x = 0;
-   p->y = 0;
+   p->x = 150;
+   p->y = 400;
    p->hits = MAXHITS;
    p->arrows = STARTINGARROWS;
    p->facing = F_DOWN;
@@ -351,8 +461,10 @@ void initGamestate(gamestate *g) {
 }
 
 void destroyGamestate(gamestate *g) {
+   printf("Freeing assets... ");
    SDL_DestroyTexture(g->terrainAtlas.tex);
    SDL_DestroyTexture(g->playerAtlas.tex);
+   printf("Done\n.");
 }
 
 void mainloop(SDL_Renderer *ren) {

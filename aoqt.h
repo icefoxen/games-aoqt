@@ -50,6 +50,8 @@ typedef struct {
 typedef struct {
    double x;
    double y;
+   double velX;
+   double velY;
    int size;
    int hits;
    int arrows;
@@ -61,6 +63,8 @@ typedef struct {
 typedef struct {
    double x;
    double y;
+   double velX;
+   double velY;
    int size;
    int hits;
    facing facing;
@@ -73,7 +77,7 @@ typedef struct {
 #define ZONEHEIGHT 12
 #define NUMMOBS 16
 typedef struct {
-   char tiles[ZONEWIDTH][ZONEHEIGHT];
+   int tiles[ZONEWIDTH][ZONEHEIGHT];
    mob mobs[NUMMOBS];
    // Exits...
 } zone;

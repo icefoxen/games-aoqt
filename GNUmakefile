@@ -7,7 +7,7 @@ LINK = gcc
 OBJ_BASES := main
 OBJS := $(addsuffix .o,$(OBJ_BASES))
 
-CFLAGS := -O3 -I include -I/usr/local/include -Wall -std=c99 -L/usr/local/lib -Wl,-rpath=/usr/local/lib -lSDL2
+CFLAGS := -O3 -I include -I/usr/local/include -Wall -std=c99 -D_XOPEN_SOURCE=600 -L/usr/local/lib -Wl,-rpath=/usr/local/lib -lSDL2
 CCF = $(CC) $(CFLAGS)
 
 PROGRAM := aoqt
