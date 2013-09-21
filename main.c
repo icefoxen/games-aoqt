@@ -57,8 +57,10 @@ void loadAtlas(atlas* atl, char *file, SDL_Renderer *ren, int spriteSize) {
 }
 
 void loadAssets(SDL_Renderer* ren, gamestate* g) {
+   printf("Loading assets... ");
    loadAtlas(&(g->terrainAtlas), "data/terrain.bmp", ren, 64);
    loadAtlas(&(g->playerAtlas), "data/player.bmp", ren, 64);
+   printf("Done.\n");
    
 }
 
@@ -85,26 +87,79 @@ void atlasCoords(atlas* atl, int index, SDL_Rect* rect) {
 //////////////////////////////////////////////////////////////////////
 // GAMEPLAY
 
-void movePlayer(gamestate *g, int dt) {
+void calcPlayer(gamestate *g, int dt) {
    inputState *i = &(g->input);
    player *p = &(g->player);
    double fdt = (double) dt;
    double movementAmount = g->player.movementSpeed * fdt / 1000.0;
    if(i->up) {
       p->y = fmax(0.0, p->y - movementAmount);
-      printf("UP: %f %f\n", movementAmount, p->y);
+      //printf("UP: %f %f\n", movementAmount, p->y);
+      p->facing = F_UP;
    } else if(i->down) {
-      p->y = fmin(SCREEN_HEIGHT - g->playerAtlas.spriteSize, p->y + movementAmount);
-      printf("DOWN: %f %f\n", movementAmount, p->y);
+      p->y = fmin(SCREEN_HEIGHT - p->size, p->y + movementAmount);
+      p->facing = F_DOWN;
+      //printf("DOWN: %f %f\n", movementAmount, p->y);
    }
 
    if(i->left) {
       p->x = fmax(0.0, p->x - movementAmount);
-      printf("LEFT: %f %f\n", movementAmount, p->x);
+      p->facing = F_LEFT;
+      //printf("LEFT: %f %f\n", movementAmount, p->x);
    } else if(i->right) {
-      p->x = fmin(SCREEN_WIDTH - g->playerAtlas.spriteSize, p->x + movementAmount);
-      printf("RIGHT: %f %f\n", movementAmount, p->x);
+      p->x = fmin(SCREEN_WIDTH - p->size, p->x + movementAmount);
+      p->facing = F_RIGHT;
+      //printf("RIGHT: %f %f\n", movementAmount, p->x);
    }
+   
+   if(i->left || i->right || i->up || i->down) {
+      p->state = PS_WALKING;
+   } else {
+      p->state = PS_STANDING;
+   }
+
+   if(i->sword) {
+   }
+
+   if(i->arrow) {
+   }
+}
+
+void calcMobs(gamestate *g, int dt) {
+}
+
+// Get bounding boxes for collision
+void getPlayerBB(player *p, SDL_Rect *rect) {
+   rect->x = (int) p->x;
+   rect->y = (int) p->y;
+   rect->w = p->size;
+   rect->h = p->size;
+}
+
+void getMobBB(mob *m, SDL_Rect *rect) {
+   rect->x = (int) m->x;
+   rect->y = (int) m->y;
+   rect->w = m->size;
+   rect->h = m->size;
+}
+
+zone* getCurrentZone(gamestate *g) {
+   return &(g->zones[g->zx][g->zy]);
+}
+
+// By definition the bottom half of an atlas image is made of
+// things that collide with you, and the top half isn't.
+void collideTerrain(gamestate *g) {
+   atlas *terrain = &(g->terrainAtlas);
+   int tileCollideThreshold = terrain->width * (terrain->height / 2);
+   SDL_Rect playerBB;
+   getPlayerBB(&(g->player), &playerBB);
+   zone *z = getCurrentZone(g);
+
+
+}
+
+void collideMobs(gamestate *g) {
 }
 
 
@@ -152,7 +207,7 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
 }
 
 void drawWorld(SDL_Renderer* ren, gamestate *g) {
-   zone *currentZone = &(g->zones[g->zx][g->zy]);
+   zone *currentZone = getCurrentZone(g);
    drawZone(ren, g, currentZone);
    drawPlayer(ren, g);
 }
@@ -186,19 +241,19 @@ void handleEvents(inputState *i) {
 		  i->keepgoing = false;
 		  break;
 	       case SDLK_UP:
-		  printf("UP\n");
+		  //printf("UP\n");
 		  i->up = true;
 		  break;
 	       case SDLK_DOWN:
-		  printf("DOWN\n");
+		  //printf("DOWN\n");
 		  i->down = true;
 		  break;
 	       case SDLK_LEFT:
-		  printf("LEFT\n");
+		  //printf("LEFT\n");
 		  i->left = true;
 		  break;
 	       case SDLK_RIGHT:
-		  printf("RIGHT\n");
+		  //printf("RIGHT\n");
 		  i->right = true;
 		  break;
 	       case SDLK_c:
@@ -246,27 +301,53 @@ void handleEvents(inputState *i) {
    }
 }
 
+//////////////////////////////////////////////////////////////////////
+// WORLD GEN
+
+void generateZone(zone *z, atlas* terrain) {
+   //int tileCollideThreshold = terrain->width * (terrain->height / 2);
+   int tileMax = terrain->width * terrain->height;
+   for(int x = 0; x < ZONEWIDTH; x++) {
+      for(int y = 0; y < ZONEHEIGHT; y++) {
+	 int tile = random() % tileMax;
+	 z->tiles[x][y] = tile;
+      }
+   }
+}
+
+
+
+void generateWorld(gamestate *g) {
+   printf("Generating world... ");
+   for(int x = 0; x < WORLDWIDTH; x++) {
+      for(int y = 0; y < WORLDHEIGHT; y++) {
+	 generateZone(&(g->zones[x][y]), &(g->terrainAtlas));
+      }
+   }
+   printf("Done.\n");
+}
+
 
 
 //////////////////////////////////////////////////////////////////////
 // MAIN STUFF
 
-void initPlayer(player *p) {
+void initPlayer(gamestate *g, player *p) {
    p->x = 0;
    p->y = 0;
    p->hits = MAXHITS;
    p->arrows = STARTINGARROWS;
    p->facing = F_DOWN;
    p->movementSpeed = 100;
+   p->size = g->playerAtlas.spriteSize;
 }
-
-
 
 void initGamestate(gamestate *g) {
    g->zx = 0;
    g->zy = 0;
-   initPlayer(&(g->player));
+   initPlayer(g, &(g->player));
    clearInput(&(g->input));
+   generateWorld(g);
 }
 
 void destroyGamestate(gamestate *g) {
@@ -287,8 +368,8 @@ void mainloop(SDL_Renderer *ren) {
    // structure on the stack.
    static gamestate g;
 
-   initGamestate(&g);
    loadAssets(ren, &g);
+   initGamestate(&g);
 
    while(keepgoing) {
       then = now;
@@ -300,7 +381,10 @@ void mainloop(SDL_Renderer *ren) {
       handleEvents(&(g.input));
       keepgoing = g.input.keepgoing;
       // Update physics
-      movePlayer(&g, dt);
+      calcPlayer(&g, dt);
+      calcMobs(&g, dt);
+      collideTerrain(&g);
+      collideMobs(&g);
 
 
       // Draw stuff
@@ -310,7 +394,8 @@ void mainloop(SDL_Renderer *ren) {
       SDL_RenderPresent(ren);
 
       //printf("Then: %d  Now: %d  Frame time: %d\n", then, now, dt);
-      //SDL_Delay(1);
+      // Yield to scheduler, I guess.
+      SDL_Delay(1);
    }
 
    double timef = ((double) SDL_GetTicks()) / 1000.0;

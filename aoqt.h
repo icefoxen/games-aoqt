@@ -2,6 +2,7 @@
 #ifndef _AOQT_H
 #define _AOQT_H
 
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -49,15 +50,18 @@ typedef struct {
 typedef struct {
    double x;
    double y;
+   int size;
    int hits;
    int arrows;
    facing facing;
    double movementSpeed;
+   playerState state;
 } player;
 
 typedef struct {
-   int x;
-   int y;
+   double x;
+   double y;
+   int size;
    int hits;
    facing facing;
 } mob;
@@ -81,6 +85,7 @@ typedef struct {
    // Width and height are in tiles
    uint32_t width;
    uint32_t height;
+   //int scalingFactor;
 } atlas;
 
 // The gamestate object that contains all the main game data.
