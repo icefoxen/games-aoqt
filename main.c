@@ -1,9 +1,4 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
-
-const int SCREEN_WIDTH = 1024;
-const int SCREEN_HEIGHT = 768;
+#include "aoqt.h"
 
 //////////////////////////////////////////////////////////////////////
 // MISC FUNCTIONS
@@ -13,39 +8,85 @@ void Cleanup() {
 
 FILE* errorStream = NULL;
 //const size_t BUFLENGTH = 256;
-void LogWarning(char *message) {
+void logWarning(char *message) {
    fprintf(errorStream, "WARNING: %s\n", message);
 }
 
-void LogError(char *message) {
+void logError(char *message) {
    fprintf(errorStream, "ERROR: %s: %s\n", message, SDL_GetError());
    fprintf(errorStream, "Bailing.\n");
    Cleanup();
    exit(1);
 }
 
-void CheckError(bool errorTest, char *message) {
+void checkError(bool errorTest, char *message) {
    if(errorTest) {
-      LogError(message);
+      logError(message);
    }
 }
 
+//////////////////////////////////////////////////////////////////////
+// RESOURCE HANDLING
 
 SDL_Texture* loadTexture(char *file, SDL_Renderer *ren) {
    SDL_Surface *imgSurf = SDL_LoadBMP(file);
    if(!imgSurf) {
-      LogWarning(file);
-      LogError("Could not load image");
+      logWarning(file);
+      logError("Could not load image");
    }
    SDL_Texture *tex = SDL_CreateTextureFromSurface(ren, imgSurf);
    SDL_FreeSurface(imgSurf);
    if(!tex) {
-      LogError("Could not create texture from image.");
+      logError("Could not create texture from image.");
    }
    return tex;
 }
 
+void loadAtlas(atlas* atl, char *file, SDL_Renderer *ren, int spriteSize) {
+   atl->tex = loadTexture(file, ren);
+   atl->spriteSize = spriteSize;
+   int w, h;
+   SDL_QueryTexture(atl->tex, NULL, NULL, &w, &h);
+   atl->width = w / atl->spriteSize;
+   atl->height = h / atl->spriteSize;
+   if(atl->width % atl->spriteSize != 0 ||
+      atl->height % atl->spriteSize != 0) {
+      logWarning("Atlas does not divide evenly into integer tiles!");
+   }
+}
 
+void loadAssets(SDL_Renderer* ren, gamestate* g) {
+   loadAtlas(&(g->terrainAtlas), "data/testsheet.bmp", ren, 64);
+   
+   
+}
+
+
+// Takes an index and turns it into a rect that tells you
+// where in the atlas the indexed sprite is.
+void atlasCoords(atlas* atl, int index, SDL_Rect* rect) {
+   SDL_assert(index >= 0);
+   int xoffset = index % atl->width;
+   int yoffset = index / atl->width;
+   SDL_assert(
+      // Always true
+      // xoffset < atl->width &&
+      yoffset < atl->height);
+   
+   rect->x = xoffset * atl->spriteSize;
+   rect->y = yoffset * atl->spriteSize;
+   rect->w = atl->spriteSize;
+   rect->h = atl->spriteSize;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+// GAMEPLAY
+
+
+//////////////////////////////////////////////////////////////////////
+// DRAWING
 // Draw a texture at x,y without changing its size.
 void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
    SDL_Rect dest = {.x = x, .y = y};
@@ -53,33 +94,63 @@ void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
    SDL_RenderCopy(ren, tex, NULL, &dest);
 }
 
+// Same as above, but takes a sprite number too
+/*
+void renderSprite(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
+   SDL_Rect dest = {.x = x, .y = y};
+   SDL_QueryTexture(tex, NULL, NULL, &dest.w, &dest.h);
+   SDL_RenderCopy(ren, tex, NULL, &dest);
+}
+*/
 
-void loadAssets() {
-   //SDL_Texture *tex = loadTexture("data/hello.bmp", ren);
+
+
+
+void drawZone(SDL_Renderer* ren, gamestate* g, zone *z) {
+   SDL_Rect sourceRect, destRect;
+   const int spriteSize = g->terrainAtlas.spriteSize;
+   destRect.w = spriteSize;
+   destRect.h = spriteSize;
+   for(int x = 0; x < ZONEWIDTH; x++) {
+      for(int y = 0; y < ZONEHEIGHT; y++) {
+	 atlasCoords(&(g->terrainAtlas), z->tiles[x][y], &sourceRect);
+	 destRect.x = x * spriteSize;
+	 destRect.y = y * spriteSize;
+	 SDL_RenderCopy(ren, g->terrainAtlas.tex, &sourceRect, &destRect);
+      }
+   }
+}
+
+void drawWorld(SDL_Renderer* ren, gamestate *g) {
+   zone *currentZone = &(g->zones[g->zx][g->zy]);
+   drawZone(ren, g, currentZone);
 }
 
 //////////////////////////////////////////////////////////////////////
-// GAMEPLAY
-
-typedef enum {
-   F_UP,
-   F_DOWN,
-   F_LEFT,
-   F_RIGHT
-} facing;
+// INPUT HANDLING
 
 
-#define MAXHITS 10
-#define STARTINGARROWS 10
-#define SWORDDAMAGE 3
-#define ARROWDAMAGE 2
-typedef struct {
-   int x;
-   int y;
-   int hits;
-   int arrows;
-   facing facing;
-} player;
+bool handleEvents() {
+   SDL_Event e;
+   while(SDL_PollEvent(&e)) {
+      switch(e.type) {
+	 case SDL_KEYDOWN:
+	    break;
+	 case SDL_KEYUP:
+	    break;
+	 case SDL_QUIT:
+	    return false;
+	 default:
+	    break;
+      }
+   }
+   return true;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////
+// MAIN STUFF
 
 void initPlayer(player *p) {
    p->x = 0;
@@ -89,70 +160,41 @@ void initPlayer(player *p) {
    p->facing = F_DOWN;
 }
 
-typedef struct {
-   int x;
-   int y;
-   int hits;
-   facing facing;
-} mob;
 
-// So apparently consts in C99 aren't actually const.
-// Because they're still stored in memory and so can be modified
-// by other means.
-#define ZONEWIDTH 40
-#define ZONEHEIGHT 30
-#define NUMMOBS 16
-typedef struct {
-   char tiles[ZONEWIDTH][ZONEHEIGHT];
-   mob mobs[NUMMOBS];
-   // Exits...
-} zone;
 
-void drawZone(zone *z) {
+void initGamestate(gamestate *g) {
+   g->zx = 0;
+   g->zy = 0;
+   initPlayer(&(g->player));
 }
-
-#define WORLDWIDTH 10
-#define WORLDHEIGHT 10
-typedef struct {
-   zone zones[WORLDWIDTH][WORLDHEIGHT];
-   // Current zone coordinates
-   uint32_t zx;
-   uint32_t zy;
-} world;
-
-void drawWorld(world *w) {
-   zone *currentZone = &w->zones[w->zx][w->zy];
-   drawZone(currentZone);
-}
-
-static player thePlayer;
-static world theWorld;
-
-//////////////////////////////////////////////////////////////////////
-// INPUT HANDLING
-
-
-
-
-//////////////////////////////////////////////////////////////////////
-// MAIN STUFF
 
 void mainloop(SDL_Renderer *ren) {
    bool keepgoing = true;
    uint32_t then = SDL_GetTicks();
    uint32_t now = then;
 
+   // This is static not to persist the variable across
+   // multiple calls of the function, but rather to put
+   // it in the data segment so we don't have this big
+   // structure on the stack.
+   static gamestate g;
+
+   initGamestate(&g);
+   loadAssets(ren, &g);
+
    while(keepgoing) {
       then = now;
       uint32_t now = SDL_GetTicks();
 
       // Get input
+      keepgoing = handleEvents();
       // Update physics
 
 
       // Draw stuff
       SDL_RenderClear(ren);
       // Draw things here
+      drawWorld(ren, &g);
       SDL_RenderPresent(ren);
 
       uint32_t dt = SDL_GetTicks() - now;
@@ -164,7 +206,7 @@ void mainloop(SDL_Renderer *ren) {
 int main(int argc, char** argv) {
    errorStream = stdout;
 
-   CheckError(SDL_Init(SDL_INIT_EVERYTHING) != 0, "SDL init error");
+   checkError(SDL_Init(SDL_INIT_EVERYTHING) != 0, "SDL init error");
 
    SDL_Window *win = SDL_CreateWindow(
       "Adventure Odyssey Quest Trek",
@@ -174,15 +216,14 @@ int main(int argc, char** argv) {
       SCREEN_HEIGHT,
       SDL_WINDOW_SHOWN);
 
-   CheckError(!win, "SDL window create error");
+   checkError(!win, "SDL window create error");
    
    SDL_Renderer *ren = SDL_CreateRenderer(win, -1,
 					  SDL_RENDERER_ACCELERATED);
-   CheckError(!ren, "SDL renderer create error");
+   checkError(!ren, "SDL renderer create error");
 
    mainloop(ren);
 
-   SDL_DestroyTexture(tex);
    SDL_DestroyRenderer(ren);
    SDL_DestroyWindow(win);
    SDL_Quit();
