@@ -85,6 +85,28 @@ void atlasCoords(atlas* atl, int index, SDL_Rect* rect) {
 //////////////////////////////////////////////////////////////////////
 // GAMEPLAY
 
+void movePlayer(gamestate *g, int dt) {
+   inputState *i = &(g->input);
+   player *p = &(g->player);
+   double fdt = (double) dt;
+   double movementAmount = g->player.movementSpeed * fdt / 1000.0;
+   if(i->up) {
+      p->y = fmax(0.0, p->y - movementAmount);
+      printf("UP: %f %f\n", movementAmount, p->y);
+   } else if(i->down) {
+      p->y = fmin(SCREEN_HEIGHT - g->playerAtlas.spriteSize, p->y + movementAmount);
+      printf("DOWN: %f %f\n", movementAmount, p->y);
+   }
+
+   if(i->left) {
+      p->x = fmax(0.0, p->x - movementAmount);
+      printf("LEFT: %f %f\n", movementAmount, p->x);
+   } else if(i->right) {
+      p->x = fmin(SCREEN_WIDTH - g->playerAtlas.spriteSize, p->x + movementAmount);
+      printf("RIGHT: %f %f\n", movementAmount, p->x);
+   }
+}
+
 
 //////////////////////////////////////////////////////////////////////
 // DRAWING
@@ -124,8 +146,8 @@ void drawZone(SDL_Renderer *ren, gamestate *g, zone *z) {
 void drawPlayer(SDL_Renderer *ren, gamestate *g) {
    SDL_Rect sourceRect, destRect;
    atlasCoords(&(g->playerAtlas), 0, &sourceRect);
-   destRect.x = g->player.x;
-   destRect.y = g->player.y;
+   destRect.x = (int) g->player.x;
+   destRect.y = (int) g->player.y;
    SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
 }
 
@@ -139,30 +161,89 @@ void drawWorld(SDL_Renderer* ren, gamestate *g) {
 // INPUT HANDLING
 
 
-bool handleEvents() {
+void clearInput(inputState *i) {
+   i->up = false;
+   i->down = false;
+   i->left = false;
+   i->right = false;
+   i->sword = false;
+   i->arrow = false;
+
+   i->keepgoing = true;
+}
+
+void handleEvents(inputState *i) {
    SDL_Event e;
    SDL_KeyboardEvent kev;
    while(SDL_PollEvent(&e)) {
       switch(e.type) {
 	 case SDL_KEYDOWN:
 	    kev = e.key;
-	    if(kev.keysym.sym == SDLK_q || 
-	       kev.keysym.sym == SDLK_ESCAPE) {
-	       return false;
+	    switch(kev.keysym.sym) {
+	       case SDLK_q:
+		  // fallthrough
+	       case SDLK_ESCAPE:
+		  i->keepgoing = false;
+		  break;
+	       case SDLK_UP:
+		  printf("UP\n");
+		  i->up = true;
+		  break;
+	       case SDLK_DOWN:
+		  printf("DOWN\n");
+		  i->down = true;
+		  break;
+	       case SDLK_LEFT:
+		  printf("LEFT\n");
+		  i->left = true;
+		  break;
+	       case SDLK_RIGHT:
+		  printf("RIGHT\n");
+		  i->right = true;
+		  break;
+	       case SDLK_c:
+		  printf("SWORD\n");
+		  i->sword = true;
+		  break;
+	       case SDLK_x:
+		  printf("ARROW\n");
+		  i->arrow = true;
+		  break;
 	    }
 	    break;
 
 	 case SDL_KEYUP:
+	    kev = e.key;
+	    switch(kev.keysym.sym) {
+	       case SDLK_UP:
+		  i->up = false;
+		  break;
+	       case SDLK_DOWN:
+		  i->down = false;
+		  break;
+	       case SDLK_LEFT:
+		  i->left = false;
+		  break;
+	       case SDLK_RIGHT:
+		  i->right = false;
+		  break;
+	       case SDLK_c:
+		  i->sword = false;
+		  break;
+	       case SDLK_x:
+		  i->arrow = false;
+		  break;
+	    }
 	    break;
 
 	 case SDL_QUIT:
-	    return false;
+	    i->keepgoing = false;
+	    break;
 
 	 default:
 	    break;
       }
    }
-   return true;
 }
 
 
@@ -176,6 +257,7 @@ void initPlayer(player *p) {
    p->hits = MAXHITS;
    p->arrows = STARTINGARROWS;
    p->facing = F_DOWN;
+   p->movementSpeed = 100;
 }
 
 
@@ -184,6 +266,7 @@ void initGamestate(gamestate *g) {
    g->zx = 0;
    g->zy = 0;
    initPlayer(&(g->player));
+   clearInput(&(g->input));
 }
 
 void destroyGamestate(gamestate *g) {
@@ -195,6 +278,8 @@ void mainloop(SDL_Renderer *ren) {
    bool keepgoing = true;
    uint32_t then = SDL_GetTicks();
    uint32_t now = then;
+   uint32_t dt = 0;
+   uint64_t framecount = 0;
 
    // This is static not to persist the variable across
    // multiple calls of the function, but rather to put
@@ -207,11 +292,15 @@ void mainloop(SDL_Renderer *ren) {
 
    while(keepgoing) {
       then = now;
-      uint32_t now = SDL_GetTicks();
+      now = SDL_GetTicks();
+      dt = now - then;
+      framecount += 1;
 
       // Get input
-      keepgoing = handleEvents();
+      handleEvents(&(g.input));
+      keepgoing = g.input.keepgoing;
       // Update physics
+      movePlayer(&g, dt);
 
 
       // Draw stuff
@@ -220,9 +309,13 @@ void mainloop(SDL_Renderer *ren) {
       drawWorld(ren, &g);
       SDL_RenderPresent(ren);
 
-      uint32_t dt = SDL_GetTicks() - now;
-      printf("Frame time: %d\n", dt);
+      //printf("Then: %d  Now: %d  Frame time: %d\n", then, now, dt);
+      //SDL_Delay(1);
    }
+
+   double timef = ((double) SDL_GetTicks()) / 1000.0;
+   printf("Game time: %f  Frames: %ld  Avg. FPS: %f\n", 
+	  timef, framecount, framecount / timef);
 
    destroyGamestate(&g);
 }

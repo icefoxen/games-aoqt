@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <SDL2/SDL.h>
 
 
@@ -29,17 +30,29 @@ typedef enum {
    PS_FIRING
 } playerState;
 
+typedef struct {
+   bool up;
+   bool down;
+   bool left;
+   bool right;
+   bool sword;
+   bool arrow;
+
+   bool keepgoing;
+} inputState;
+
 
 #define MAXHITS 10
 #define STARTINGARROWS 10
 #define SWORDDAMAGE 3
 #define ARROWDAMAGE 2
 typedef struct {
-   int x;
-   int y;
+   double x;
+   double y;
    int hits;
    int arrows;
    facing facing;
+   double movementSpeed;
 } player;
 
 typedef struct {
@@ -78,6 +91,8 @@ typedef struct {
    // Current zone coordinates
    uint32_t zx;
    uint32_t zy;
+
+   inputState input;
 
    player player;
    atlas terrainAtlas;
