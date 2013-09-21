@@ -140,8 +140,39 @@ void calcPlayer(gamestate *g, int dt) {
    double xOffset = p->velX * fdt / 1000.0;
    double yOffset = p->velY * fdt / 1000.0;
 
-   p->x = fmax(0.0, fmin(SCREEN_WIDTH  - p->size, p->x + xOffset));
-   p->y = fmax(0.0, fmin(SCREEN_HEIGHT - p->size, p->y + yOffset));
+   p->x = p->x + xOffset;
+   p->y = p->y + yOffset;
+   // If x or y are out of bounds of the screen, we flip over to the
+   // adjacent zone and move the player to the opposite side of the screen,
+   // making it so they have gone off one edge in one zone and entered the
+   // opposite edge of the other zone.
+   // This means all we have to do is make sure the appropraite walls of each
+   // zone are unblocked, and that the world as a whole doesn't let anyone wander
+   // off of it.
+   // ...oooh, or we could just wrap the zones...  I like that idea.
+   if(p->x < 0) {
+      // Move one zone to the left
+      g->zx = (g->zx - 1) % WORLDWIDTH;
+      p->x = SCREEN_WIDTH - p->size;
+      printf("ZX is now %d\n", g->zx);
+   } else if(p->x + p->size > SCREEN_WIDTH) {
+      // move one zone to the right
+      g->zx = (g->zx + 1) % WORLDWIDTH;
+      p->x = 0;
+      printf("ZX is now %d\n", g->zx);
+   }
+
+   if(p->y < 0) {
+      // Move one zone up
+      g->zy = (g->zy - 1) % WORLDHEIGHT;
+      p->y = SCREEN_HEIGHT - p->size;
+      printf("ZY is now %d\n", g->zy);
+   } else if(p->y + p->size > SCREEN_HEIGHT) {
+      // Move one zone down
+      g->zy = (g->zy + 1) % WORLDHEIGHT;
+      p->y = 0;
+      printf("ZY is now %d\n", g->zy);
+   }
 }
 
 void calcMob(gamestate *g, mob *m, int dt) {
@@ -200,28 +231,7 @@ void handlePlayerTerrainCollision(gamestate *g, SDL_Rect *collision) {
       // We are hitting a tile above us
       p->velY = 0;
       p->y += collision->h;
-   }
-
-
-
-/*
-   if(collision->x > p->x && p->facing == F_RIGHT) {
-      // We are hitting a tile on the right
-      printf("Collision to the right\n");
-   } else {
-      // We are hitting a tile on the left
-      printf("Collision to the left\n");
-   }
-
-   if(collision->y > p->y) {
-      // We are hitting a tile below us
-      printf("Collision to the bottom\n");
-   } else {
-      // We are hitting a tile above us
-      printf("Collision to the top\n");
-   }
-*/
-   
+   }   
 }
 
 // By definition the bottom half of an atlas image is made of
