@@ -424,13 +424,43 @@ void handleEvents(inputState *i) {
 //////////////////////////////////////////////////////////////////////
 // WORLD GEN
 
-void generateZone(zone *z, atlas* terrain) {
-   //int tileCollideThreshold = terrain->width * (terrain->height / 2);
-   int tileMax = terrain->width * terrain->height;
+// Fills a zone with floor tiles, and adds walls around the edges.
+void generateEmptyZone(zone *z) {
    for(int x = 0; x < ZONEWIDTH; x++) {
       for(int y = 0; y < ZONEHEIGHT; y++) {
-	 int tile = random() % tileMax;
-	 z->tiles[x][y] = tile;
+	 if(x == 0 || y == 0 ||
+	    x == ZONEWIDTH - 1 || y == ZONEHEIGHT - 1) {
+	    // Put in wall
+	    z->tiles[x][y] = 254;
+	 } else {
+	    // Put in floor.
+	    z->tiles[x][y] = 0;
+	 }
+      }
+   }
+}
+
+void makeZoneExits(zone *z) {
+   z->tiles[5][0] = 0;
+   z->tiles[5][ZONEHEIGHT-1] = 0;
+   z->tiles[6][0] = 0;
+   z->tiles[6][ZONEHEIGHT-1] = 0;
+
+   z->tiles[0][5] = 0;
+   z->tiles[ZONEWIDTH-1][5] = 0;
+   z->tiles[0][6] = 0;
+   z->tiles[ZONEWIDTH-1][6] = 0;
+}
+
+void generateZone(zone *z, atlas* terrain) {
+   //int tileCollideThreshold = terrain->width * (terrain->height / 2);
+   //int tileMax = terrain->width * terrain->height;
+   for(int x = 0; x < ZONEWIDTH; x++) {
+      for(int y = 0; y < ZONEHEIGHT; y++) {
+	 generateEmptyZone(z);
+	 makeZoneExits(z);
+	 //int tile = random() % tileMax;
+	 //z->tiles[x][y] = tile;
       }
    }
 }
