@@ -1028,6 +1028,13 @@ void mainloop(SDL_Renderer *ren) {
       //printf("Then: %d  Now: %d  Frame time: %d\n", then, now, dt);
       // Yield to scheduler, I guess.
       SDL_Delay(1);
+
+
+
+      // Check for player death
+      if(g.player.hits <= 0) {
+	 keepgoing = false;
+      }
    }
 
    double timef = ((double) SDL_GetTicks()) / 1000.0;
@@ -1051,7 +1058,7 @@ void doSplashScreen(SDL_Renderer *ren, char *image) {
 	       SDL_SetTextureAlphaMod(tex, (Uint8) fadeout);
 	       SDL_RenderCopy(ren, tex, NULL, NULL);
 	       SDL_RenderPresent(ren);
-	       SDL_Delay(5);
+	       SDL_Delay(6);
 	    }
 	    SDL_DestroyTexture(tex);
 	    return;
