@@ -117,16 +117,40 @@ typedef struct {
    int flashTimer;
 } mob;
 
+typedef enum {
+   P_HEALTH,
+   P_ARROWS,
+
+   P_MAX
+} powerupKind;
+
+#define ARROWPOWERUPCOUNT 5
+#define HEALTHPOWERUPAMOUNT 3
+#define POWERUPDROPCHANCE 2
+#define POWERUPDURATION 5000
+typedef struct {
+   double x;
+   double y;
+   double size;
+   powerupKind kind;
+   int timer;
+
+   bool show;
+   int flashTimer;
+} powerup;
+
 // So apparently consts in C99 aren't actually const.
 // Because they're still stored in memory and so can be modified
 // by other means.
 #define ZONEWIDTH 16
 #define ZONEHEIGHT 12
 #define NUMMOBS 16
+// Each mob drops at most one powerup.
+#define NUMPOWERUPS NUMMOBS
 typedef struct {
    int tiles[ZONEWIDTH][ZONEHEIGHT];
    mob mobs[NUMMOBS];
-   // Exits...
+   powerup powerups[NUMPOWERUPS];
 } zone;
 
 
@@ -155,6 +179,7 @@ typedef struct {
    atlas playerAtlas;
    atlas mobAtlas;
    atlas weaponAtlas;
+   atlas powerupAtlas;
 } gamestate;
 
 #endif  // _AOQT_H

@@ -66,6 +66,7 @@ void loadAssets(SDL_Renderer* ren, gamestate* g) {
    loadAtlas(&(g->playerAtlas), "data/player.bmp", ren, 64);
    loadAtlas(&(g->mobAtlas), "data/mob.bmp", ren, 64);
    loadAtlas(&(g->weaponAtlas), "data/weapons.bmp", ren, 64);
+   loadAtlas(&(g->powerupAtlas), "data/powerups.bmp", ren, 64);
    printf("Done.\n");
 }
 
@@ -186,10 +187,36 @@ void damagePlayer(player *p, int damage) {
    }
 }
 
-void damageMob(mob *m, int damage) {
+powerupKind randomPowerupKind() {
+   return (powerupKind) (rand() % P_MAX);
+}
+
+void dropPowerup(zone *z, mob *m) {
+   // We go through the powerups array
+   // and find the first one that is
+   // available.
+   for(int i = 0; i < NUMPOWERUPS; i++) {
+      powerup *pu = &(z->powerups[i]);
+      if(pu->timer <= 0) {
+	 pu->x = m->x;
+	 pu->y = m->y;
+	 pu->size = 64;
+	 pu->kind = randomPowerupKind();
+	 pu->timer = POWERUPDURATION;
+	 pu->show = true;
+	 return;
+      }
+   }
+}
+
+void damageMob(zone *z, mob *m, int damage) {
    if(m->flashyTime <= 0) {
       m->hits -= damage;
       m->flashyTime = FLASHYTIME;
+
+      if(m->hits <= 0 && (rand() % POWERUPDROPCHANCE) == 0) {
+	 dropPowerup(z, m);
+      }
    }
 }
 
@@ -544,7 +571,7 @@ void collidePlayerWithMobs(gamestate *g) {
 	 //printf("Arrow BB: %d %d %d %d\n", arrowBB.x, arrowBB.y, arrowBB.w, arrowBB.h);
 	 if(SDL_IntersectRect(&arrowBB, &mobBB, &result)) {
 	    //printf("Hit mob %d\n", i);
-	    damageMob(m, ARROWDAMAGE);
+	    damageMob(z, m, ARROWDAMAGE);
 	    p->arrowFired = false;
 	 }
       }
@@ -556,7 +583,7 @@ void collidePlayerWithMobs(gamestate *g) {
 	 //printf("Sword BB: %d %d %d %d\n", swordBB.x, swordBB.y, swordBB.w, swordBB.h);
 	 if(SDL_IntersectRect(&swordBB, &mobBB, &result)) {
 	    // Crap, do mobs get flashy time too?  They have to...
-	    damageMob(m, SWORDDAMAGE);
+	    damageMob(z, m, SWORDDAMAGE);
 	 }
       }
    }
@@ -654,9 +681,34 @@ void drawMobs(SDL_Renderer *ren, gamestate *g) {
    }
 }
 
+void drawPowerup(SDL_Renderer *ren, gamestate *g, powerup *pu) {
+  if(pu->show) {
+      SDL_Rect sourceRect, destRect;
+      atlasCoords(&(g->powerupAtlas), (int) pu->kind, &sourceRect);
+      destRect.x = (int) pu->x;
+      destRect.y = (int) pu->y;
+      destRect.w = sourceRect.w;
+      destRect.h = sourceRect.h;
+      SDL_RenderCopy(ren, g->powerupAtlas.tex, &sourceRect, &destRect);
+   }
+}
+
+void drawPowerups(SDL_Renderer *ren, gamestate *g) {
+   zone *z = getCurrentZone(g);
+   for(int i = 0; i < NUMPOWERUPS; i++) {
+      powerup *pu = &(z->powerups[i]);
+      //printf("Drawing mob %d at %f %f...\n", i, m->x, m->y);
+      if(pu->timer > 0) {
+	 drawPowerup(ren, g, pu);
+      }
+   }
+}
+
+
 void drawWorld(SDL_Renderer* ren, gamestate *g) {
    zone *currentZone = getCurrentZone(g);
    drawZone(ren, g, currentZone);
+   drawPowerups(ren, g);
    drawMobs(ren, g);
    drawPlayer(ren, g);
 }
@@ -796,6 +848,14 @@ void initMob1(mob *m) {
    m->turnTimer = rand() % MOBTURNINTERVAL;
 }
 
+
+// At start, there are no powerups in a zone.
+void clearPowerups(zone *z) {
+   for(int i = 0; i < NUMPOWERUPS; i++) {
+      z->powerups[i].timer = 0;
+   }
+}
+
 void generateMobs(zone *z) {
    int numMobs = rand() % NUMMOBS;
    for(int i = 0; i < NUMMOBS; i++) {
@@ -819,6 +879,7 @@ void generateZone(zone *z, atlas* terrain) {
       for(int y = 0; y < ZONEHEIGHT; y++) {
 	 generateEmptyZone(z);
 	 makeZoneExits(z);
+	 clearPowerups(z);
 	 //int tile = rand() % tileMax;
 	 //z->tiles[x][y] = tile;
       }
@@ -870,6 +931,9 @@ void destroyGamestate(gamestate *g) {
    printf("Freeing assets... ");
    SDL_DestroyTexture(g->terrainAtlas.tex);
    SDL_DestroyTexture(g->playerAtlas.tex);
+   SDL_DestroyTexture(g->mobAtlas.tex);
+   SDL_DestroyTexture(g->weaponAtlas.tex);
+   SDL_DestroyTexture(g->powerupAtlas.tex);
    printf("Done\n.");
 }
 
