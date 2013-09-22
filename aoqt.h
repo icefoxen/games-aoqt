@@ -1,4 +1,3 @@
-
 #ifndef _AOQT_H
 #define _AOQT_H
 
@@ -118,14 +117,15 @@ typedef struct {
 } mob;
 
 typedef enum {
-   P_HEALTH,
-   P_ARROWS,
+   PU_HEALTH,
+   PU_ARROWS,
 
-   P_MAX
+   PU_MAX
 } powerupKind;
 
 #define ARROWPOWERUPCOUNT 5
 #define HEALTHPOWERUPAMOUNT 3
+// The drop chance is 1/POWERUPDROPCHANCE
 #define POWERUPDROPCHANCE 2
 #define POWERUPDURATION 5000
 typedef struct {

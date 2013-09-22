@@ -188,7 +188,7 @@ void damagePlayer(player *p, int damage) {
 }
 
 powerupKind randomPowerupKind() {
-   return (powerupKind) (rand() % P_MAX);
+   return (powerupKind) (rand() % PU_MAX);
 }
 
 void dropPowerup(zone *z, mob *m) {
@@ -395,6 +395,16 @@ void calcMobs(gamestate *g, int dt) {
    }
 }
 
+void calcPowerups(gamestate *g, int dt) {
+   zone *z = getCurrentZone(g);
+   for(int i = 0; i < NUMPOWERUPS; i++) {
+      powerup *pu = &(z->powerups[i]);
+      if(pu->timer > 0) {
+	 pu->timer -= dt;
+      }
+   }
+}
+
 // Get bounding boxes for collision
 void getPlayerBB(player *p, SDL_Rect *rect) {
    rect->x = (int) p->x;
@@ -425,6 +435,13 @@ void getSwordBB(player *p, SDL_Rect *rect) {
    rect->h = p->swordSize;
    rect->x = (int) (p->x + p->swordXOffset);
    rect->y = (int) (p->y + p->swordYOffset);
+}
+
+void getPowerupBB(powerup *pu, SDL_Rect *rect) {
+   rect->w = pu->size;
+   rect->h = pu->size;
+   rect->x = (int) pu->x;
+   rect->y = (int) pu->y;
 }
 
 
@@ -585,6 +602,39 @@ void collidePlayerWithMobs(gamestate *g) {
 	    // Crap, do mobs get flashy time too?  They have to...
 	    damageMob(z, m, SWORDDAMAGE);
 	 }
+      }
+   }
+}
+
+void pickupPowerup(player *p, powerup *pu) {
+   switch(pu->kind) {
+      case PU_HEALTH:
+	 p->hits = (int) fmax(MAXHITS, p->hits+HEALTHPOWERUPAMOUNT);
+	 break;
+      case PU_ARROWS:
+	 p->arrows += ARROWPOWERUPCOUNT;
+	 break;
+      default:
+	 // Should never happen
+	 SDL_assert(false);
+   }
+   pu->timer = 0;
+}
+
+void collidePlayerWithPowerups(gamestate *g) {
+   zone *z = getCurrentZone(g);
+   player *p = &(g->player);
+   for(int i = 0; i < NUMPOWERUPS; i++) {
+      powerup *pu = &(z->powerups[i]);
+      if(pu->timer > 0) {
+	 SDL_Rect playerBB, powerupBB, result;
+	 getPlayerBB(p, &playerBB);
+	 getPowerupBB(pu, &powerupBB);
+	 if(SDL_IntersectRect(&playerBB, &powerupBB, &result)) {
+	    pickupPowerup(p, pu);
+	 }
+      } else {
+	 continue;
       }
    }
 }
@@ -965,8 +1015,10 @@ void mainloop(SDL_Renderer *ren) {
       // Update physics
       calcPlayer(&g, dt);
       calcMobs(&g, dt);
+      calcPowerups(&g, dt);
       collideTerrain(&g);
       collidePlayerWithMobs(&g);
+      collidePlayerWithPowerups(&g);
 
 
       // Draw stuff
