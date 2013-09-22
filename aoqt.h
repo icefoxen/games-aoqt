@@ -47,6 +47,8 @@ typedef struct {
 #define STARTINGARROWS 10
 #define SWORDDAMAGE 3
 #define ARROWDAMAGE 2
+#define FLASHYTIME 750
+#define FLASHINTERVAL 50
 typedef struct {
    double x;
    double y;
@@ -58,6 +60,9 @@ typedef struct {
    facing facing;
    double movementSpeed;
    playerState state;
+   int flashyTime;
+   bool show;
+   int flashTimer;
 } player;
 
 typedef struct {
@@ -68,6 +73,7 @@ typedef struct {
    int size;
    int hits;
    facing facing;
+   int damage;
 } mob;
 
 // So apparently consts in C99 aren't actually const.
@@ -106,6 +112,7 @@ typedef struct {
    player player;
    atlas terrainAtlas;
    atlas playerAtlas;
+   atlas mobAtlas;
 } gamestate;
 
 #endif  // _AOQT_H

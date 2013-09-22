@@ -64,6 +64,7 @@ void loadAssets(SDL_Renderer* ren, gamestate* g) {
    printf("Loading assets... ");
    loadAtlas(&(g->terrainAtlas), "data/terrain.bmp", ren, 64);
    loadAtlas(&(g->playerAtlas), "data/player.bmp", ren, 64);
+   loadAtlas(&(g->mobAtlas), "data/mob.bmp", ren, 64);
    printf("Done.\n");
    
 }
@@ -131,11 +132,34 @@ void handlePlayerInput(gamestate *g) {
    }
 }
 
+void damagePlayer(player *p, int damage) {
+   if(p->flashyTime <= 0) {
+      p->hits -= damage;
+      p->flashyTime = FLASHYTIME;
+      printf("Ow!  Took %d damage, HP = %d\n", damage, p->hits);
+   }
+}
+
 void calcPlayer(gamestate *g, int dt) {
    player *p = &(g->player);
    double fdt = (double) dt;
    //double movementAmount = g->player.movementSpeed * fdt / 1000.0;
 
+   // Handle flashy time
+   p->flashyTime -= dt;
+   if(p->flashyTime <= 0) {
+      p->flashyTime = 0;
+      p->show = true;
+   } else {
+      p->flashTimer -= dt;
+      if(p->flashTimer <= 0) {
+	 p->show = !p->show;
+	 p->flashTimer = FLASHINTERVAL;
+      }
+   }
+
+
+   // Handle movement & input
    handlePlayerInput(g);
    double xOffset = p->velX * fdt / 1000.0;
    double yOffset = p->velY * fdt / 1000.0;
@@ -209,12 +233,11 @@ void getMobBB(mob *m, SDL_Rect *rect) {
    rect->h = m->size;
 }
 
+
+
 void handlePlayerTerrainCollision(gamestate *g, SDL_Rect *collision) {
    player *p = &(g->player);
 
-   // This assumes that nothing except deliberate player movement
-   // can move the player.
-   // No knockback, etc.  
    if(p->velX > 0 && collision->x > p->x) {
       // We are hitting a tile on the right
       p->velX = 0;
@@ -234,8 +257,29 @@ void handlePlayerTerrainCollision(gamestate *g, SDL_Rect *collision) {
    }   
 }
 
-// By definition the bottom half of an atlas image is made of
-// things that collide with you, and the top half isn't.
+// XXX: More code duplication
+// This is exactly the same as above, but
+// for mobs instead of players.
+void handleMobTerrainCollision(mob *m, SDL_Rect *collision) {
+   if(m->velX > 0 && collision->x > m->x) {
+      // We are hitting a tile on the right
+      m->velX = 0;
+      m->x -= collision->w;
+   } else if(m->velX < 0 && collision->x <= m->x) {
+      // We are hitting a tile on the left
+      m->velX = 0;
+      m->x += collision->w;
+   } else if(m->velY > 0 && collision->y > m->y) {
+      // We are hitting a tile below us
+      m->velY = 0;
+      m->y -= collision->h;
+   } else if(m->velY < 0 && collision->y <= m->y) {
+      // We are hitting a tile above us
+      m->velY = 0;
+      m->y += collision->h;
+   }   
+}
+
 void collideTerrain(gamestate *g) {
    atlas *terrain = &(g->terrainAtlas);
    int tileCollideThreshold = terrain->width * (terrain->height / 2);
@@ -263,14 +307,56 @@ void collideTerrain(gamestate *g) {
 	 }
       }
    }
+
+   // Then we do the exact same thing for mobs.
+   // XXX: Yay code duplication!
+   tileRect.w = terrain->spriteSize;
+   tileRect.h = terrain->spriteSize;
+   for(int x = 0; x < ZONEWIDTH; x++) {
+      for(int y = 0; y < ZONEHEIGHT; y++) {
+	 int tile = z->tiles[x][y];
+	 if(tile < tileCollideThreshold) {
+	    continue;
+	 } else {
+	    tileRect.x = x * terrain->spriteSize;
+	    tileRect.y = y * terrain->spriteSize;
+	    SDL_Rect result;
+	    for(int i = 0; i < NUMMOBS; i++) {
+	       mob *m = &(z->mobs[i]);
+	       SDL_Rect mobBB;
+	       getMobBB(m, &mobBB);
+	       if(m->hits > 0 && SDL_IntersectRect(&mobBB, &tileRect, &result)) {
+		  handleMobTerrainCollision(m, &result);
+	       }
+	    }
+	 }
+      }
+   }
 }
 
-void collideMobs(gamestate *g) {
+
+void collidePlayerWithMobs(gamestate *g) {
+   zone *z = getCurrentZone(g);
+   player *p = &(g->player);
+   for(int i = 0; i < NUMMOBS; i++) {
+      mob *m = &(z->mobs[i]);
+      if(m->hits <= 0) {
+	 continue;
+      }
+      SDL_Rect playerBB, mobBB, result;
+      getPlayerBB(p, &playerBB);
+      getMobBB(m, &mobBB);
+      if(SDL_IntersectRect(&playerBB, &mobBB, &result)) {
+	 //printf("Mob colliding with player\n");
+	 damagePlayer(p, m->damage);
+      }
+   }
 }
 
 
 //////////////////////////////////////////////////////////////////////
 // DRAWING
+/*
 // Draw a texture at x,y without changing its size.
 void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
    SDL_Rect dest = {.x = x, .y = y};
@@ -279,7 +365,6 @@ void renderTexture(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
 }
 
 // Same as above, but takes a sprite number too
-/*
 void renderSprite(SDL_Texture *tex, SDL_Renderer *ren, int x, int y) {
    SDL_Rect dest = {.x = x, .y = y};
    SDL_QueryTexture(tex, NULL, NULL, &dest.w, &dest.h);
@@ -305,20 +390,32 @@ void drawZone(SDL_Renderer *ren, gamestate *g, zone *z) {
 }
 
 void drawPlayer(SDL_Renderer *ren, gamestate *g) {
-   SDL_Rect sourceRect, destRect;
-   atlasCoords(&(g->playerAtlas), 0, &sourceRect);
-   destRect.x = (int) g->player.x;
-   destRect.y = (int) g->player.y;
-   SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
+   if(g->player.show) {
+      SDL_Rect sourceRect, destRect;
+      atlasCoords(&(g->playerAtlas), 0, &sourceRect);
+      destRect.x = (int) g->player.x;
+      destRect.y = (int) g->player.y;
+      destRect.w = sourceRect.w;
+      destRect.h = sourceRect.h;
+      SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
+   }
 }
 
 void drawMob(SDL_Renderer *ren, gamestate *g, mob *m) {
+   SDL_Rect sourceRect, destRect;
+   atlasCoords(&(g->mobAtlas), 0, &sourceRect);
+   destRect.x = (int) m->x;
+   destRect.y = (int) m->y;
+   destRect.w = sourceRect.w;
+   destRect.h = sourceRect.h;
+   SDL_RenderCopy(ren, g->mobAtlas.tex, &sourceRect, &destRect);
 }
 
 void drawMobs(SDL_Renderer *ren, gamestate *g) {
    zone *z = getCurrentZone(g);
    for(int i = 0; i < NUMMOBS; i++) {
       mob *m = &(z->mobs[i]);
+      //printf("Drawing mob %d at %f %f...\n", i, m->x, m->y);
       if(m->hits > 0) {
 	 drawMob(ren, g, m);
       }
@@ -328,8 +425,8 @@ void drawMobs(SDL_Renderer *ren, gamestate *g) {
 void drawWorld(SDL_Renderer* ren, gamestate *g) {
    zone *currentZone = getCurrentZone(g);
    drawZone(ren, g, currentZone);
-   drawPlayer(ren, g);
    drawMobs(ren, g);
+   drawPlayer(ren, g);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -452,6 +549,34 @@ void makeZoneExits(zone *z) {
    z->tiles[ZONEWIDTH-1][6] = 0;
 }
 
+void initMob1(mob *m) {
+   // XXX: Find a better way to place mobs
+   m->x = (random() % 10 + 2) * 64;
+   m->y = (random() % 8 + 1) * 64;
+   m->velX = 0;
+   m->velY = 0;
+   m->size = 64;
+   m->hits = 8;
+   m->facing = F_DOWN;
+   m->damage = 1;
+}
+
+void generateMobs(zone *z) {
+   int numMobs = random() % NUMMOBS;
+   for(int i = 0; i < NUMMOBS; i++) {
+      mob *m = &(z->mobs[i]);
+      initMob1(m);
+      // We have to init all the mobs to _something_
+      // But if they're not doing anything we kill
+      // them instantly and they get ignored.
+      if(i > numMobs) {
+	 m->hits = 0;
+      }
+   }
+
+   //printf("Number of mobs: %d\n", numMobs);
+}
+
 void generateZone(zone *z, atlas* terrain) {
    //int tileCollideThreshold = terrain->width * (terrain->height / 2);
    //int tileMax = terrain->width * terrain->height;
@@ -463,6 +588,8 @@ void generateZone(zone *z, atlas* terrain) {
 	 //z->tiles[x][y] = tile;
       }
    }
+
+   generateMobs(z);
 }
 
 
@@ -490,6 +617,7 @@ void initPlayer(gamestate *g, player *p) {
    p->facing = F_DOWN;
    p->movementSpeed = 100;
    p->size = g->playerAtlas.spriteSize;
+   p->show = true;
 }
 
 void initGamestate(gamestate *g) {
@@ -536,7 +664,7 @@ void mainloop(SDL_Renderer *ren) {
       calcPlayer(&g, dt);
       calcMobs(&g, dt);
       collideTerrain(&g);
-      collideMobs(&g);
+      collidePlayerWithMobs(&g);
 
 
       // Draw stuff
