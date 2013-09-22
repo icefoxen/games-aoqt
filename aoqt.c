@@ -780,12 +780,11 @@ void clearInput(inputState *i) {
 
 void handleEvents(inputState *i) {
    SDL_Event e;
-   SDL_KeyboardEvent kev;
+   //SDL_KeyboardEvent kev;
    while(SDL_PollEvent(&e)) {
       switch(e.type) {
 	 case SDL_KEYDOWN:
-	    kev = e.key;
-	    switch(kev.keysym.sym) {
+	    switch(e.key.keysym.sym) {
 	       case SDLK_q:
 		  // fallthrough
 	       case SDLK_ESCAPE:
@@ -818,8 +817,7 @@ void handleEvents(inputState *i) {
 	    break;
 
 	 case SDL_KEYUP:
-	    kev = e.key;
-	    switch(kev.keysym.sym) {
+	    switch(e.key.keysym.sym) {
 	       case SDLK_UP:
 		  i->up = false;
 		  break;
@@ -1039,6 +1037,29 @@ void mainloop(SDL_Renderer *ren) {
    destroyGamestate(&g);
 }
 
+void doSplashScreen(SDL_Renderer *ren, char *image) {
+   SDL_Texture *tex = loadTexture(image, ren);
+   while(true) {
+      SDL_RenderClear(ren);
+      SDL_RenderCopy(ren, tex, NULL, NULL);
+      SDL_RenderPresent(ren);
+      SDL_Event e;
+      while(SDL_PollEvent(&e)) {
+	 if(e.type == SDL_KEYDOWN) {
+	    for(int fadeout = 255; fadeout > 0; fadeout--) {
+	       SDL_RenderClear(ren);
+	       SDL_SetTextureAlphaMod(tex, (Uint8) fadeout);
+	       SDL_RenderCopy(ren, tex, NULL, NULL);
+	       SDL_RenderPresent(ren);
+	       SDL_Delay(5);
+	    }
+	    SDL_DestroyTexture(tex);
+	    return;
+	 }
+      }
+   }
+}
+
 
 int main(int argc, char** argv) {
    errorStream = stdout;
@@ -1059,7 +1080,11 @@ int main(int argc, char** argv) {
 					  SDL_RENDERER_ACCELERATED);
    checkError(!ren, "SDL renderer create error");
 
+   doSplashScreen(ren, "data/titlescreen.bmp");
+
    mainloop(ren);
+
+   doSplashScreen(ren, "data/endscreen.bmp");
 
    SDL_DestroyRenderer(ren);
    SDL_DestroyWindow(win);
