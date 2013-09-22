@@ -57,7 +57,8 @@ typedef struct {
 #define FLASHYTIME 750
 #define FLASHINTERVAL 50
 #define ARROWREFIRE 300
-#define SWORDREFIRE 250
+#define SWORDREFIRE 750
+#define SWORDDURATION (SWORDREFIRE * 2 / 3)
 typedef struct {
    double x;
    double y;

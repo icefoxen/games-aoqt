@@ -485,7 +485,7 @@ void collidePlayerWithMobs(gamestate *g) {
       }
 
       // Sword
-      if(p->swordTimer > 0) {
+      if(p->swordTimer > SWORDDURATION) {
 	 SDL_Rect swordBB;
 	 getSwordBB(p, &swordBB);
 	 //printf("Sword BB: %d %d %d %d\n", swordBB.x, swordBB.y, swordBB.w, swordBB.h);
@@ -555,7 +555,7 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
    }
 
    // And draw the sword!
-   if(g->player.swordTimer > 0) {
+   if(g->player.swordTimer > SWORDDURATION) {
       SDL_Rect sourceRect, destRect;
       atlasCoords(&(g->weaponAtlas), 1, &sourceRect);
       destRect.x = (int) (g->player.x + g->player.swordXOffset);
