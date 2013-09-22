@@ -43,6 +43,8 @@ typedef struct {
 } inputState;
 
 
+#define PLAYERSPEED 150
+#define ARROWSPEED 500
 #define MAXHITS 10
 #define STARTINGARROWS 10
 #define SWORDDAMAGE 3
@@ -63,6 +65,12 @@ typedef struct {
    int flashyTime;
    bool show;
    int flashTimer;
+
+   // We can have one arrow on the screen at a time!
+   bool arrowFired;
+   double arrowX;
+   double arrowY;
+   facing arrowFacing;
 } player;
 
 typedef struct {
@@ -113,6 +121,7 @@ typedef struct {
    atlas terrainAtlas;
    atlas playerAtlas;
    atlas mobAtlas;
+   atlas weaponAtlas;
 } gamestate;
 
 #endif  // _AOQT_H

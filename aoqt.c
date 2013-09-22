@@ -65,8 +65,8 @@ void loadAssets(SDL_Renderer* ren, gamestate* g) {
    loadAtlas(&(g->terrainAtlas), "data/terrain.bmp", ren, 64);
    loadAtlas(&(g->playerAtlas), "data/player.bmp", ren, 64);
    loadAtlas(&(g->mobAtlas), "data/mob.bmp", ren, 64);
+   loadAtlas(&(g->weaponAtlas), "data/weapons.bmp", ren, 64);
    printf("Done.\n");
-   
 }
 
 
@@ -91,6 +91,20 @@ void atlasCoords(atlas* atl, int index, SDL_Rect* rect) {
 
 //////////////////////////////////////////////////////////////////////
 // GAMEPLAY
+
+void fireArrow(gamestate *g) {
+   player *p = &(g->player);
+   // If we haven't fired an arrow already
+   // And we have ammo
+   if(!p->arrowFired && p->arrows > 0) {
+      printf("Arrow fired\n");
+      p->arrowFired = true;
+      p->arrowFacing = p->facing;
+      p->arrowX = p->x + (p->size / 4);
+      p->arrowY = p->y + (p->size / 4);
+      p->arrows -= 1;
+   }
+}
 
 void handlePlayerInput(gamestate *g) {
    inputState *i = &(g->input);
@@ -129,6 +143,7 @@ void handlePlayerInput(gamestate *g) {
    }
 
    if(i->arrow) {
+      fireArrow(g);
    }
 }
 
@@ -138,6 +153,10 @@ void damagePlayer(player *p, int damage) {
       p->flashyTime = FLASHYTIME;
       printf("Ow!  Took %d damage, HP = %d\n", damage, p->hits);
    }
+}
+
+void damageMob(mob *m, int damage) {
+   m->hits -= damage;
 }
 
 void calcPlayer(gamestate *g, int dt) {
@@ -155,6 +174,31 @@ void calcPlayer(gamestate *g, int dt) {
       if(p->flashTimer <= 0) {
 	 p->show = !p->show;
 	 p->flashTimer = FLASHINTERVAL;
+      }
+   }
+
+   // Handle arrows
+   double arrowMovement = ARROWSPEED * fdt / 1000.0;
+   if(p->arrowFired) {
+      //printf("Arrow at %f %f\n", p->arrowX, p->arrowY);
+      switch(p->arrowFacing) {
+	 case F_UP:
+	    p->arrowY -= arrowMovement;
+	    break;
+	 case F_DOWN:
+	    p->arrowY += arrowMovement;
+	    break;
+	 case F_LEFT:
+	    p->arrowX -= arrowMovement;
+	    break;
+	 case F_RIGHT:
+	    p->arrowX += arrowMovement;
+	    break;
+      }
+
+      if(p->arrowY < 0 || p->arrowY > SCREEN_HEIGHT ||
+	 p->arrowX < 0 || p->arrowX > SCREEN_WIDTH) {
+	 p->arrowFired = false;
       }
    }
 
@@ -231,6 +275,15 @@ void getMobBB(mob *m, SDL_Rect *rect) {
    rect->y = (int) m->y;
    rect->w = m->size;
    rect->h = m->size;
+}
+
+void getArrowBB(player *p, SDL_Rect *rect) {
+   rect->x = (int) p->arrowX;
+   rect->y = (int) p->arrowY;
+   // XXX: Arrows are smaller than a full tile, really...
+   // And the bounding box depends on the orientation, too.
+   rect->w = 64;
+   rect->h = 64;
 }
 
 
@@ -335,6 +388,7 @@ void collideTerrain(gamestate *g) {
 }
 
 
+// Handles weapon collisions too.
 void collidePlayerWithMobs(gamestate *g) {
    zone *z = getCurrentZone(g);
    player *p = &(g->player);
@@ -350,9 +404,19 @@ void collidePlayerWithMobs(gamestate *g) {
 	 //printf("Mob colliding with player\n");
 	 damagePlayer(p, m->damage);
       }
+
+      if(p->arrowFired) {
+	 SDL_Rect arrowBB;
+	 getArrowBB(p, &arrowBB);
+	 //printf("Arrow BB: %d %d %d %d\n", arrowBB.x, arrowBB.y, arrowBB.w, arrowBB.h);
+	 if(SDL_IntersectRect(&arrowBB, &mobBB, &result)) {
+	    //printf("Hit mob %d\n", i);
+	    damageMob(m, ARROWDAMAGE);
+	    p->arrowFired = false;
+      }
+      }
    }
 }
-
 
 //////////////////////////////////////////////////////////////////////
 // DRAWING
@@ -398,6 +462,17 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
       destRect.w = sourceRect.w;
       destRect.h = sourceRect.h;
       SDL_RenderCopy(ren, g->playerAtlas.tex, &sourceRect, &destRect);
+   }
+
+   // Draw arrows too!
+   if(g->player.arrowFired) {
+      SDL_Rect sourceRect, destRect;
+      atlasCoords(&(g->weaponAtlas), 0, &sourceRect);
+      destRect.x = (int) g->player.arrowX;
+      destRect.y = (int) g->player.arrowY;
+      destRect.w = sourceRect.w;
+      destRect.h = sourceRect.h;
+      SDL_RenderCopy(ren, g->weaponAtlas.tex, &sourceRect, &destRect);
    }
 }
 
@@ -478,7 +553,6 @@ void handleEvents(inputState *i) {
 		  i->sword = true;
 		  break;
 	       case SDLK_x:
-		  printf("ARROW\n");
 		  i->arrow = true;
 		  break;
 	    }
@@ -610,14 +684,15 @@ void generateWorld(gamestate *g) {
 // MAIN STUFF
 
 void initPlayer(gamestate *g, player *p) {
-   p->x = 150;
-   p->y = 400;
+   p->x = SCREEN_WIDTH / 2;
+   p->y = SCREEN_HEIGHT / 2;
    p->hits = MAXHITS;
    p->arrows = STARTINGARROWS;
    p->facing = F_DOWN;
-   p->movementSpeed = 100;
+   p->movementSpeed = PLAYERSPEED;
    p->size = g->playerAtlas.spriteSize;
    p->show = true;
+   p->arrowFired = false;
 }
 
 void initGamestate(gamestate *g) {
