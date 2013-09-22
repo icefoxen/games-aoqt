@@ -7,7 +7,7 @@ LINK = gcc
 OBJ_BASES := aoqt
 OBJS := $(addsuffix .o,$(OBJ_BASES))
 
-CFLAGS := -O3 -Wall -std=c99 -D_XOPEN_SOURCE=600 `sdl2-config --cflags`
+CFLAGS := -Wall -std=c99 -D_XOPEN_SOURCE=600 `sdl2-config --cflags`
 LDFLAGS := `sdl2-config --libs`
 
 PROGRAM := aoqt

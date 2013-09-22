@@ -21,7 +21,9 @@ typedef enum {
    F_UP,
    F_DOWN,
    F_LEFT,
-   F_RIGHT
+   F_RIGHT,
+
+   F_MAX
 } facing;
 
 typedef enum {
@@ -95,6 +97,8 @@ typedef struct {
    
 } player;
 
+
+#define MOBSPEED 200
 typedef struct {
    double x;
    double y;
@@ -104,6 +108,7 @@ typedef struct {
    int hits;
    facing facing;
    int damage;
+   bool hitSomething;
 
    int flashyTime;
    bool show;

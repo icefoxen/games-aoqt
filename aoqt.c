@@ -129,6 +129,9 @@ void swingSword(gamestate *g) {
 	    p->swordXOffset = p->size;
 	    p->swordYOffset = 0;
 	    break;
+	 default:
+	    // Other options are invalid!
+	 SDL_assert(false);
       }
    }
 }
@@ -225,6 +228,9 @@ void calcPlayer(gamestate *g, int dt) {
 	 case F_RIGHT:
 	    p->arrowX += arrowMovement;
 	    break;
+	 default:
+	    // Other options are invalid!
+	    SDL_assert(false);
       }
 
       if(p->arrowY < 0 || p->arrowY > SCREEN_HEIGHT ||
@@ -288,14 +294,11 @@ double clamp(double from, double to, double val) {
    return fmax(from, fmin(to, val));
 }
 
+facing getRandomFacing() {
+   return (facing) (rand() % F_MAX);
+}
+
 void calcMob(gamestate *g, mob *m, int dt) {
-   double fdt = (double) dt;
-   double xOffset = m->velX * fdt / 1000.0;
-   double yOffset = m->velY * fdt / 1000.0;
-
-   m->x = clamp(0.0, SCREEN_WIDTH  - m->size, m->x + xOffset);
-   m->y = clamp(0.0, SCREEN_HEIGHT - m->size, m->y + yOffset);
-
    // Handle flashy time
    m->flashyTime -= dt;
    if(m->flashyTime <= 0) {
@@ -308,6 +311,43 @@ void calcMob(gamestate *g, mob *m, int dt) {
 	 m->flashTimer = FLASHINTERVAL;
       }
    }
+
+   // Now for my next trick, movement!
+   // Mobs just wander forward until they hit something.
+   // So not too tricky.
+   if(m->hitSomething) {
+      m->hitSomething = false;
+      m->facing = getRandomFacing();
+   }
+
+   switch(m->facing) {
+      case F_UP:
+	 m->velX = 0;
+	 m->velY = -MOBSPEED;
+	 break;
+      case F_DOWN:
+	 m->velX = 0;
+	 m->velY = MOBSPEED;
+	 break;
+      case F_LEFT:
+	 m->velX = -MOBSPEED;
+	 m->velY = 0;
+	 break;
+      case F_RIGHT:
+	 m->velX = MOBSPEED;
+	 m->velY = 0;
+	 break;
+      default:
+	 // Other options are invalid!
+	 SDL_assert(false);
+   }
+
+   double fdt = (double) dt;
+   double xOffset = m->velX * fdt / 1000.0;
+   double yOffset = m->velY * fdt / 1000.0;
+
+   m->x = clamp(0.0, SCREEN_WIDTH  - m->size, m->x + xOffset);
+   m->y = clamp(0.0, SCREEN_HEIGHT - m->size, m->y + yOffset);
 
 }
 
@@ -385,18 +425,22 @@ void handleMobTerrainCollision(mob *m, SDL_Rect *collision) {
       // We are hitting a tile on the right
       m->velX = 0;
       m->x -= collision->w;
+      m->hitSomething = true;
    } else if(m->velX < 0 && collision->x <= m->x) {
       // We are hitting a tile on the left
       m->velX = 0;
       m->x += collision->w;
+      m->hitSomething = true;
    } else if(m->velY > 0 && collision->y > m->y) {
       // We are hitting a tile below us
       m->velY = 0;
       m->y -= collision->h;
+      m->hitSomething = true;
    } else if(m->velY < 0 && collision->y <= m->y) {
       // We are hitting a tile above us
       m->velY = 0;
       m->y += collision->h;
+      m->hitSomething = true;
    }   
 }
 
@@ -430,6 +474,9 @@ void collideTerrain(gamestate *g) {
 
    // Then we do the exact same thing for mobs.
    // XXX: Yay code duplication!
+   // Almost the exact same thing anyway, since mobs can't
+   // wander into other zones and so need to bounce off map
+   // boundaries.
    tileRect.w = terrain->spriteSize;
    tileRect.h = terrain->spriteSize;
    for(int x = 0; x < ZONEWIDTH; x++) {
@@ -452,6 +499,17 @@ void collideTerrain(gamestate *g) {
 	 }
       }
    }
+
+   for(int i = 0; i < NUMMOBS; i++) {
+      mob *m = &(z->mobs[i]);
+      if(m->x <= 0 || m->x >= (SCREEN_WIDTH  - m->size - 1) ||
+	 m->y <= 0 || m->y >= (SCREEN_HEIGHT - m->size - 1)) {
+	 m->hitSomething = true;
+      }
+   }
+
+
+
 }
 
 
@@ -689,12 +747,15 @@ void handleEvents(inputState *i) {
 
 // Fills a zone with floor tiles, and adds walls around the edges.
 void generateEmptyZone(zone *z) {
+   //int tileCollideThreshold = terrain->width * (terrain->height / 2);
    for(int x = 0; x < ZONEWIDTH; x++) {
       for(int y = 0; y < ZONEHEIGHT; y++) {
 	 if(x == 0 || y == 0 ||
 	    x == ZONEWIDTH - 1 || y == ZONEHEIGHT - 1) {
 	    // Put in wall
-	    z->tiles[x][y] = 254;
+	    // XXX: This works if the terrain atlas is 10x10 tiles,
+	    // but not if it's 16x16
+	    z->tiles[x][y] = 60;
 	 } else {
 	    // Put in floor.
 	    z->tiles[x][y] = 0;
@@ -717,18 +778,18 @@ void makeZoneExits(zone *z) {
 
 void initMob1(mob *m) {
    // XXX: Find a better way to place mobs
-   m->x = (random() % 10 + 2) * 64;
-   m->y = (random() % 8 + 1) * 64;
+   m->x = (rand() % 10 + 2) * 64;
+   m->y = (rand() % 8 + 1) * 64;
    m->velX = 0;
    m->velY = 0;
    m->size = 64;
    m->hits = 8;
-   m->facing = F_DOWN;
+   m->facing = getRandomFacing();
    m->damage = 1;
 }
 
 void generateMobs(zone *z) {
-   int numMobs = random() % NUMMOBS;
+   int numMobs = rand() % NUMMOBS;
    for(int i = 0; i < NUMMOBS; i++) {
       mob *m = &(z->mobs[i]);
       initMob1(m);
@@ -750,7 +811,7 @@ void generateZone(zone *z, atlas* terrain) {
       for(int y = 0; y < ZONEHEIGHT; y++) {
 	 generateEmptyZone(z);
 	 makeZoneExits(z);
-	 //int tile = random() % tileMax;
+	 //int tile = rand() % tileMax;
 	 //z->tiles[x][y] = tile;
       }
    }
