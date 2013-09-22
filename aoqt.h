@@ -51,6 +51,8 @@ typedef struct {
 #define ARROWDAMAGE 2
 #define FLASHYTIME 750
 #define FLASHINTERVAL 50
+#define ARROWREFIRE 300
+#define SWORDREFIRE 250
 typedef struct {
    double x;
    double y;
@@ -67,10 +69,20 @@ typedef struct {
    int flashTimer;
 
    // We can have one arrow on the screen at a time!
+   // But that means if you mash up against an enemy you
+   // can fire one arrow per frame, so we still have a
+   // refire rate.
    bool arrowFired;
+   int arrowTimer;
    double arrowX;
    double arrowY;
    facing arrowFacing;
+
+   // And of course one sword.
+   // The sword has a refire rate.
+   int swordTimer;
+   facing swordFacing;
+   
 } player;
 
 typedef struct {

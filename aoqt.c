@@ -96,14 +96,18 @@ void fireArrow(gamestate *g) {
    player *p = &(g->player);
    // If we haven't fired an arrow already
    // And we have ammo
-   if(!p->arrowFired && p->arrows > 0) {
+   if(!p->arrowFired && p->arrowTimer == 0 && p->arrows > 0) {
       printf("Arrow fired\n");
       p->arrowFired = true;
+      p->arrowTimer = ARROWREFIRE;
       p->arrowFacing = p->facing;
       p->arrowX = p->x + (p->size / 4);
       p->arrowY = p->y + (p->size / 4);
       p->arrows -= 1;
    }
+}
+
+void swingSword(gamestate *g) {
 }
 
 void handlePlayerInput(gamestate *g) {
@@ -201,6 +205,7 @@ void calcPlayer(gamestate *g, int dt) {
 	 p->arrowFired = false;
       }
    }
+   p->arrowTimer = fmax(0, p->arrowTimer - dt);
 
 
    // Handle movement & input
@@ -419,7 +424,7 @@ void collidePlayerWithMobs(gamestate *g) {
 	    //printf("Hit mob %d\n", i);
 	    damageMob(m, ARROWDAMAGE);
 	    p->arrowFired = false;
-      }
+	 }
       }
    }
 }
