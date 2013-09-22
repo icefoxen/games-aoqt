@@ -50,7 +50,7 @@ typedef struct {
 // It _would_ be nice to refactor that out, but,
 // game jam.
 
-#define PLAYERSPEED 150
+#define PLAYERSPEED 200
 #define ARROWSPEED 500
 #define MAXHITS 10
 #define STARTINGARROWS 10
@@ -98,7 +98,8 @@ typedef struct {
 } player;
 
 
-#define MOBSPEED 200
+#define MOBSPEED 150
+#define MOBTURNINTERVAL 2500
 typedef struct {
    double x;
    double y;
@@ -109,6 +110,7 @@ typedef struct {
    facing facing;
    int damage;
    bool hitSomething;
+   int turnTimer;
 
    int flashyTime;
    bool show;

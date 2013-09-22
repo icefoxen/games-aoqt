@@ -97,7 +97,7 @@ void fireArrow(gamestate *g) {
    // If we haven't fired an arrow already
    // And we have ammo
    if(!p->arrowFired && p->arrowTimer == 0 && p->arrows > 0) {
-      printf("Arrow fired\n");
+      //printf("Arrow fired\n");
       p->arrowFired = true;
       p->arrowTimer = ARROWREFIRE;
       p->arrowFacing = p->facing;
@@ -313,10 +313,17 @@ void calcMob(gamestate *g, mob *m, int dt) {
    }
 
    // Now for my next trick, movement!
-   // Mobs just wander forward until they hit something.
+   // Mobs just wander forward until they hit something,
+   // turning every once in a while.
    // So not too tricky.
    if(m->hitSomething) {
       m->hitSomething = false;
+      m->facing = getRandomFacing();
+   }
+
+   m->turnTimer -= dt;
+   if(m->turnTimer <= 0) {
+      m->turnTimer = MOBTURNINTERVAL + (rand() % MOBTURNINTERVAL);
       m->facing = getRandomFacing();
    }
 
@@ -699,7 +706,7 @@ void handleEvents(inputState *i) {
 		  i->right = true;
 		  break;
 	       case SDLK_c:
-		  printf("SWORD\n");
+		  //printf("SWORD\n");
 		  i->sword = true;
 		  break;
 	       case SDLK_x:
@@ -786,6 +793,7 @@ void initMob1(mob *m) {
    m->hits = 8;
    m->facing = getRandomFacing();
    m->damage = 1;
+   m->turnTimer = rand() % MOBTURNINTERVAL;
 }
 
 void generateMobs(zone *z) {
