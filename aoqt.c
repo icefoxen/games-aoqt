@@ -220,27 +220,33 @@ void calcPlayer(gamestate *g, int dt) {
    // ...oooh, or we could just wrap the zones...  I like that idea.
    if(p->x < 0) {
       // Move one zone to the left
-      g->zx = (g->zx - 1) % WORLDWIDTH;
+      // This idiom gets remainder rather than modulo,
+      // so we don't have (negative % positive = negative)
+      g->zx = (g->zx + WORLDWIDTH - 1) % WORLDWIDTH;
       p->x = SCREEN_WIDTH - p->size;
       printf("ZX is now %d\n", g->zx);
-   } else if(p->x + p->size > SCREEN_WIDTH) {
+   } else if(p->x + p->size >= SCREEN_WIDTH) {
       // move one zone to the right
-      g->zx = (g->zx + 1) % WORLDWIDTH;
+      g->zx = (g->zx + WORLDWIDTH + 1) % WORLDWIDTH;
       p->x = 0;
       printf("ZX is now %d\n", g->zx);
    }
 
    if(p->y < 0) {
       // Move one zone up
-      g->zy = (g->zy - 1) % WORLDHEIGHT;
+      g->zy = (g->zy + WORLDHEIGHT - 1) % WORLDHEIGHT;
       p->y = SCREEN_HEIGHT - p->size;
       printf("ZY is now %d\n", g->zy);
-   } else if(p->y + p->size > SCREEN_HEIGHT) {
+   } else if(p->y + p->size >= SCREEN_HEIGHT) {
       // Move one zone down
-      g->zy = (g->zy + 1) % WORLDHEIGHT;
+      g->zy = (g->zy + WORLDHEIGHT + 1) % WORLDHEIGHT;
       p->y = 0;
       printf("ZY is now %d\n", g->zy);
    }
+}
+
+double clamp(double from, double to, double val) {
+   return fmax(from, fmin(to, val));
 }
 
 void calcMob(gamestate *g, mob *m, int dt) {
@@ -248,8 +254,8 @@ void calcMob(gamestate *g, mob *m, int dt) {
    double xOffset = m->velX * fdt / 1000.0;
    double yOffset = m->velY * fdt / 1000.0;
 
-   m->x = fmax(0.0, fmin(SCREEN_WIDTH  - m->size, m->x + xOffset));
-   m->y = fmax(0.0, fmin(SCREEN_HEIGHT - m->size, m->y + yOffset));
+   m->x = clamp(0.0, SCREEN_WIDTH  - m->size, m->x + xOffset);
+   m->y = clamp(0.0, SCREEN_HEIGHT - m->size, m->y + yOffset);
 }
 
 void calcMobs(gamestate *g, int dt) {
