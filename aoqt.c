@@ -108,6 +108,29 @@ void fireArrow(gamestate *g) {
 }
 
 void swingSword(gamestate *g) {
+   player *p = &(g->player);
+   if(p->swordTimer == 0) {
+      p->swordTimer = SWORDREFIRE;
+      p->swordFacing = p->facing;
+      switch(p->swordFacing) {
+	 case F_UP:
+	    p->swordXOffset = 0;
+	    p->swordYOffset = -p->swordSize;
+	    break;
+	 case F_DOWN:
+	    p->swordXOffset = 0;
+	    p->swordYOffset = p->size;
+	    break;
+	 case F_LEFT:
+	    p->swordXOffset = -p->swordSize;
+	    p->swordYOffset = 0;
+	    break;
+	 case F_RIGHT:
+	    p->swordXOffset = p->size;
+	    p->swordYOffset = 0;
+	    break;
+      }
+   }
 }
 
 void handlePlayerInput(gamestate *g) {
@@ -144,6 +167,7 @@ void handlePlayerInput(gamestate *g) {
    }
    
    if(i->sword) {
+      swingSword(g);
    }
 
    if(i->arrow) {
@@ -160,7 +184,10 @@ void damagePlayer(player *p, int damage) {
 }
 
 void damageMob(mob *m, int damage) {
-   m->hits -= damage;
+   if(m->flashyTime <= 0) {
+      m->hits -= damage;
+      m->flashyTime = FLASHYTIME;
+   }
 }
 
 void calcPlayer(gamestate *g, int dt) {
@@ -206,6 +233,13 @@ void calcPlayer(gamestate *g, int dt) {
       }
    }
    p->arrowTimer = fmax(0, p->arrowTimer - dt);
+
+   // Handle sword
+   if(p->swordTimer > 0) {
+      p->swordTimer -= dt;
+   } else {
+      p->swordTimer = 0;
+   }
 
 
    // Handle movement & input
@@ -261,6 +295,20 @@ void calcMob(gamestate *g, mob *m, int dt) {
 
    m->x = clamp(0.0, SCREEN_WIDTH  - m->size, m->x + xOffset);
    m->y = clamp(0.0, SCREEN_HEIGHT - m->size, m->y + yOffset);
+
+   // Handle flashy time
+   m->flashyTime -= dt;
+   if(m->flashyTime <= 0) {
+      m->flashyTime = 0;
+      m->show = true;
+   } else {
+      m->flashTimer -= dt;
+      if(m->flashTimer <= 0) {
+	 m->show = !m->show;
+	 m->flashTimer = FLASHINTERVAL;
+      }
+   }
+
 }
 
 void calcMobs(gamestate *g, int dt) {
@@ -295,6 +343,14 @@ void getArrowBB(player *p, SDL_Rect *rect) {
    // And the bounding box depends on the orientation, too.
    rect->w = 64;
    rect->h = 64;
+}
+
+void getSwordBB(player *p, SDL_Rect *rect) {
+   // XXX: Sword size should probably be a rectangle, not a square.
+   rect->w = p->swordSize;
+   rect->h = p->swordSize;
+   rect->x = (int) (p->x + p->swordXOffset);
+   rect->y = (int) (p->y + p->swordYOffset);
 }
 
 
@@ -416,6 +472,7 @@ void collidePlayerWithMobs(gamestate *g) {
 	 damagePlayer(p, m->damage);
       }
 
+      // Arrows
       if(p->arrowFired) {
 	 SDL_Rect arrowBB;
 	 getArrowBB(p, &arrowBB);
@@ -424,6 +481,17 @@ void collidePlayerWithMobs(gamestate *g) {
 	    //printf("Hit mob %d\n", i);
 	    damageMob(m, ARROWDAMAGE);
 	    p->arrowFired = false;
+	 }
+      }
+
+      // Sword
+      if(p->swordTimer > 0) {
+	 SDL_Rect swordBB;
+	 getSwordBB(p, &swordBB);
+	 //printf("Sword BB: %d %d %d %d\n", swordBB.x, swordBB.y, swordBB.w, swordBB.h);
+	 if(SDL_IntersectRect(&swordBB, &mobBB, &result)) {
+	    // Crap, do mobs get flashy time too?  They have to...
+	    damageMob(m, SWORDDAMAGE);
 	 }
       }
    }
@@ -485,16 +553,29 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
       destRect.h = sourceRect.h;
       SDL_RenderCopy(ren, g->weaponAtlas.tex, &sourceRect, &destRect);
    }
+
+   // And draw the sword!
+   if(g->player.swordTimer > 0) {
+      SDL_Rect sourceRect, destRect;
+      atlasCoords(&(g->weaponAtlas), 1, &sourceRect);
+      destRect.x = (int) (g->player.x + g->player.swordXOffset);
+      destRect.y = (int) (g->player.y + g->player.swordYOffset);
+      destRect.w = sourceRect.w;
+      destRect.h = sourceRect.h;
+      SDL_RenderCopy(ren, g->weaponAtlas.tex, &sourceRect, &destRect);
+   }
 }
 
 void drawMob(SDL_Renderer *ren, gamestate *g, mob *m) {
-   SDL_Rect sourceRect, destRect;
-   atlasCoords(&(g->mobAtlas), 0, &sourceRect);
-   destRect.x = (int) m->x;
-   destRect.y = (int) m->y;
-   destRect.w = sourceRect.w;
-   destRect.h = sourceRect.h;
-   SDL_RenderCopy(ren, g->mobAtlas.tex, &sourceRect, &destRect);
+   if(m->show) {
+      SDL_Rect sourceRect, destRect;
+      atlasCoords(&(g->mobAtlas), 0, &sourceRect);
+      destRect.x = (int) m->x;
+      destRect.y = (int) m->y;
+      destRect.w = sourceRect.w;
+      destRect.h = sourceRect.h;
+      SDL_RenderCopy(ren, g->mobAtlas.tex, &sourceRect, &destRect);
+   }
 }
 
 void drawMobs(SDL_Renderer *ren, gamestate *g) {
@@ -704,6 +785,8 @@ void initPlayer(gamestate *g, player *p) {
    p->size = g->playerAtlas.spriteSize;
    p->show = true;
    p->arrowFired = false;
+
+   p->swordSize = 64;
 }
 
 void initGamestate(gamestate *g) {

@@ -43,6 +43,11 @@ typedef struct {
 } inputState;
 
 
+// The player and mobs share many characteristics;
+// hit points, flashy time, facing, etc.
+// It _would_ be nice to refactor that out, but,
+// game jam.
+
 #define PLAYERSPEED 150
 #define ARROWSPEED 500
 #define MAXHITS 10
@@ -80,8 +85,12 @@ typedef struct {
 
    // And of course one sword.
    // The sword has a refire rate.
+   // However what it REALLY needs is a cooldown...
    int swordTimer;
    facing swordFacing;
+   double swordXOffset;
+   double swordYOffset;
+   double swordSize;
    
 } player;
 
@@ -94,6 +103,10 @@ typedef struct {
    int hits;
    facing facing;
    int damage;
+
+   int flashyTime;
+   bool show;
+   int flashTimer;
 } mob;
 
 // So apparently consts in C99 aren't actually const.
