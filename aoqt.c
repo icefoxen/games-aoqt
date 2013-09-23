@@ -862,7 +862,7 @@ void generateEmptyZone(zone *z) {
 	    // Put in wall
 	    // XXX: This works if the terrain atlas is 10x10 tiles,
 	    // but not if it's 16x16
-	    z->tiles[x][y] = 60;
+	    z->tiles[x][y] = 128;
 	 } else {
 	    // Put in floor.
 	    z->tiles[x][y] = 0;

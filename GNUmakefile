@@ -22,10 +22,11 @@ clean:
 test: $(PROGRAM)
 	$(PROGRAM)
 
+# Gotta repeat cflags and ldflags or mingw hates us
 $(PROGRAM): $(OBJS)
-	$(LINK) $(LDFLAGS) -o $(PROGRAM) $(OBJS)
+	$(LINK) $(LDFLAGS) -o $(PROGRAM) $(OBJS) $(LDFLAGS)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) -c $< $(CFLAGS)
 
 # Now how do we make .c files depend on the appropriate .h files?
