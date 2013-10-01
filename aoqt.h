@@ -11,8 +11,13 @@
 // So const's in C99 aren't actually constant, because they
 // have memory locations which can be messed with in various
 // ways.
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 768
+// XXX: Enums can actually do this properly, stupidly enough.
+//#define SCREEN_WIDTH 1024
+//#define SCREEN_HEIGHT 768
+enum {
+   SCREEN_WIDTH = 1024,
+   SCREEN_HEIGHT = 768
+};
 
 
 
@@ -42,6 +47,26 @@ typedef struct {
 
    bool keepgoing;
 } inputState;
+
+typedef struct {
+   SDL_Rect bb;
+   double velX;
+   double velY;
+   facing facing;
+   
+   int flashyTime;
+   bool show;
+   int flashTimer;
+
+   int spriteRow;
+
+   // Atlas reference?
+} gameobj;
+
+// XXX: Maybe
+typedef struct {
+   
+} animFrame;
 
 
 // The player and mobs share many characteristics;
