@@ -8,7 +8,7 @@ OBJ_BASES := aoqt
 OBJS := $(addsuffix .o,$(OBJ_BASES))
 
 CFLAGS := -Wall -std=c99 -D_XOPEN_SOURCE=600 `sdl2-config --cflags`
-LDFLAGS := `sdl2-config --libs`
+LDFLAGS := -lm `sdl2-config --libs`
 
 PROGRAM := aoqt
 
@@ -24,7 +24,7 @@ test: $(PROGRAM)
 
 # Gotta repeat cflags and ldflags or mingw hates us
 $(PROGRAM): $(OBJS)
-	$(LINK) $(LDFLAGS) -o $(PROGRAM) $(OBJS) $(LDFLAGS)
+	$(LINK) $(CFLAGS) $(LDFLAGS) -o $(PROGRAM) $(OBJS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< $(CFLAGS)

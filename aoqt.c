@@ -706,6 +706,11 @@ void drawPlayer(SDL_Renderer *ren, gamestate *g) {
       destRect.h = sourceRect.h;
       SDL_RenderCopy(ren, g->weaponAtlas.tex, &sourceRect, &destRect);
    }
+
+   // How to draw lines.  Sort of sucks 'cause we can't specify width.
+   //const SDL_Point points[2] = { {.x = 10, .y = 10}, {.x = 200, .y = 200} };
+   //SDL_SetRenderDrawColor(ren, 255, 0, 0, 255);
+   //SDL_RenderDrawLines(ren, (SDL_Point*) &points, 2);
 }
 
 void drawMob(SDL_Renderer *ren, gamestate *g, mob *m) {
